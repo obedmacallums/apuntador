@@ -98,7 +98,7 @@
       <h3>Lectura</h3>
       <div class="row"><span>Tamaño del texto</span>
         <div class="step"><button id="fsDown" aria-label="Texto más pequeño">−</button><output id="fsOut">40 px</output><button id="fsUp" aria-label="Texto más grande">+</button></div></div>
-      <div class="row"><span>Resaltar palabra a palabra<small>Estimado según la duración de cada línea</small></span>
+      <div class="row"><span>Resaltar palabra a palabra<small>Exacto en lo transcrito con tiempos por palabra; en los SRT, estimado</small></span>
         <button class="sw" id="swKaraoke" role="switch" aria-checked="true" aria-label="Resaltar palabra a palabra"></button></div>
       <div class="row"><span>Modo espejo<small>Para cristales de teleprompter</small></span>
         <button class="sw" id="swMirror" role="switch" aria-checked="false" aria-label="Modo espejo"></button></div>
@@ -106,6 +106,13 @@
       <div class="seg" id="rates" role="group" aria-label="Velocidad"></div>
       <div class="row"><span>Sincronía del texto<small>Positivo si el texto va atrasado</small></span>
         <div class="step"><button id="offDown" aria-label="Retrasar texto 0,1 segundos">−</button><output id="offOut">0,0 s</output><button id="offUp" aria-label="Adelantar texto 0,1 segundos">+</button></div></div>
+      <h3>Transcripción</h3>
+      <div class="row"><span>Procesar con<small id="devNote">Auto elige GPU o CPU según el modelo.</small></span></div>
+      <div class="seg" id="devSeg" role="group" aria-label="Procesar la transcripción con">
+        <button type="button" data-d="auto" title="Elige según tu equipo y el modelo">Auto</button><button type="button" data-d="gpu" title="Tarjeta gráfica (WebGPU)">GPU</button><button type="button" data-d="cpu" title="Procesador (WASM)">CPU</button>
+      </div>
+      <div class="row"><span>Tiempos por palabra<small>El resaltado sigue la voz exacta. Desactívalo si transcribir va lento.</small></span>
+        <button class="sw" id="swWords" role="switch" aria-checked="true" aria-label="Tiempos por palabra al transcribir"></button></div>
       <h3 class="hide-sm">Teclado</h3>
       <dl class="keys hide-sm">
         <dt><kbd>Espacio</kbd></dt><dd>Reproducir o pausar</dd>
@@ -146,6 +153,7 @@
     </button>
   </div>
   <p class="fine" id="txAudio"></p>
+  <p class="fine" id="txDev"></p>
   <fieldset class="models" id="txModels"><legend>Modelo</legend></fieldset>
   <label class="field">Idioma del audio
     <select id="txLang">

@@ -1,0 +1,14 @@
+{
+  "name": "apuntador",
+  "private": true,
+  "description": "Teleprompter que sigue tu audio línea a línea con su SRT y transcribe con Whisper en el navegador",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:lan": "vite --mode lan"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "2.3.0",
+    "vite": "8.3.4"
+  }
+}
