@@ -1,0 +1,16 @@
+.DS_Store
+Thumbs.db
+*.log
+node_modules/
+.vscode/
+.idea/
+
+# Audio y subtítulos de prueba: no los subas al repo por accidente
+*.mp3
+*.m4a
+*.wav
+*.aiff
+*.ogg
+*.flac
+*.srt
+*.vtt
