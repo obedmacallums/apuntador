@@ -125,7 +125,10 @@ Requiere Node.js 20.19 o posterior.
 ```sh
 npm install        # una vez
 npm run dev        # http://localhost:5173, se recarga sola al guardar
+npm test           # pruebas: SRT, emparejamiento, biblioteca, elección de modelo por equipo
 ```
+
+Las pruebas usan el ejecutor que trae Node (`node --test`), sin dependencias. Cubren las partes sin interfaz, que son funciones puras: lo que se muestra en pantalla se prueba abriendo la app.
 
 ### Probar en el teléfono o el iPad
 
@@ -137,7 +140,7 @@ Abre en el teléfono o el iPad la dirección *Network* que muestra la terminal; 
 
 ### Por qué hay un plugin en `vite.config.js`
 
-Vite reescribe los `.js` que sirve. En `js/worker.js`, cambiaría `import(runtime.lib)` por una función auxiliar y añadiría un `import` estático, que un worker clásico no puede cargar. El plugin sirve `js/` y `css/` byte a byte, igual que GitHub Pages, y recarga la página cuando cambia cualquier archivo.
+Vite reescribe los `.js` que sirve. En `js/transcribe/worker.js` cambiaría `import(runtime.lib)` por una función auxiliar y añadiría un `import` de su propio cliente, que el worker no puede cargar. El plugin sirve `js/` y `css/` (con sus subcarpetas) byte a byte, igual que GitHub Pages, y recarga la página cuando cambia cualquier archivo.
 
 ### Sin Node
 
@@ -157,15 +160,58 @@ Todas las rutas son relativas, así que funciona igual en un subdirectorio de pr
 
 ## Estructura
 
+El código son módulos de JavaScript (`import`/`export`) que el navegador carga directamente, sin compilar. `index.html` carga `js/main.js` y este importa el resto.
+
 ```
-index.html        Marcado de la app
-css/styles.css    Estilos (tema claro y oscuro automático)
-js/app.js         Reproductor, parser de SRT/VTT, biblioteca e interfaz de transcripción
-js/worker.js      Web Worker que ejecuta Whisper con transformers.js
+index.html                Marcado de la app
 favicon.svg
-package.json      Solo para desarrollo: Vite y los comandos npm run dev / dev:lan
-vite.config.js    Configuración del servidor de desarrollo
+css/
+  base.css                Colores (claro y oscuro), botones y piezas comunes
+  shell.css               Cabecera, aviso y controles de reproducción
+  prompter.css            Las líneas, la flecha de lectura y la pantalla vacía
+  settings.css            Panel de Ajustes
+  transcribe.css          Ventana de transcripción
+  library.css             Biblioteca
+js/
+  main.js                 Arranque: conecta los módulos y reabre lo último
+  state.js                Lo que está en pantalla, compartido entre módulos
+  ui.js                   $, el(), avisos (toast)
+  format.js               Formatos de tiempo y tamaño, hash          (puro)
+  srt.js                  Leer y escribir SRT/VTT                      (puro)
+  pairing.js              Reglas de qué texto va con qué audio         (puro)
+  player.js               El reloj: archivo de audio o simulado
+  prompter.js             Líneas, resaltado palabra a palabra, barra de tiempo
+  screen.js               El aviso y la pantalla vacía (lista de textos de un audio)
+  session.js              El texto abierto: abrir, cerrar, su audio, posición
+  files.js                Elegir o arrastrar archivos
+  settings.js             Ajustes guardados y su panel
+  controls.js             Botones, teclado y pantalla completa
+  library/
+    data.js               Registros: clave de audio, nombres, agrupar  (puro)
+    texts.js              Textos y datos de audios en localStorage
+    audios.js             Archivos de audio en IndexedDB y migración
+    panel.js              Panel de la biblioteca
+  transcribe/
+    models.js             Modelos Whisper y versión de transformers.js (puro)
+    device.js             Detectar el equipo y elegir GPU/CPU         (puro)
+    audio.js              Preparar el audio: 16 kHz y tramos de 30 s
+    lines.js              Convertir la salida de Whisper en líneas    (puro)
+    dialog.js             Ventana «Transcribir con Whisper»
+    run.js                La transcripción en curso y guardar el resultado
+    worker.js             Web Worker (módulo) que ejecuta Whisper
+tests/                    npm test: una prueba por cada módulo puro
+package.json              Solo para desarrollo: Vite, npm run dev / dev:lan / test
+vite.config.js            Configuración del servidor de desarrollo
 ```
+
+Los módulos marcados como *puros* no tocan la página ni el navegador, y por eso las pruebas los cargan en Node.
+
+### Dónde va cada cosa nueva
+
+- **Una regla nueva** (cuándo emparejar, cómo agrupar, cómo cortar líneas): en un módulo puro, con su prueba en `tests/`.
+- **Una pantalla o un panel nuevo:** su propio módulo, con una función `initX()` que conecta los botones y que se llama desde `main.js`, y su propio archivo en `css/`.
+- **Algo que deben ver varios módulos:** en `state.js` si es lo que está en pantalla. Si no, se queda dentro de su módulo y se expone con funciones.
+- **Al arrancar, los módulos solo definen cosas;** todo lo que usa otro módulo ocurre dentro de funciones. Así los módulos que se importan entre sí funcionan sin importar el orden en que se cargan.
 
 ## Dónde se guardan los datos
 
@@ -185,13 +231,13 @@ Los modelos se descargan **una sola vez**. Desde el diálogo de transcripción p
 
 La app no incluye binarios en el repositorio. Los carga desde estos servicios:
 
-- **[transformers.js](https://github.com/huggingface/transformers.js) 3.8.1** y su runtime ONNX en WASM, desde jsDelivr (versión fija en `js/app.js`, constante `TJS_VERSION`).
+- **[transformers.js](https://github.com/huggingface/transformers.js) 3.8.1** y su runtime ONNX en WASM, desde jsDelivr (versión fija en `js/transcribe/models.js`, constante `TJS_VERSION`).
 - **Modelos** desde Hugging Face: [`whisper-tiny_timestamped`](https://huggingface.co/onnx-community/whisper-tiny_timestamped), [`whisper-base_timestamped`](https://huggingface.co/onnx-community/whisper-base_timestamped), [`whisper-small_timestamped`](https://huggingface.co/onnx-community/whisper-small_timestamped) y [`whisper-large-v3-turbo_timestamped`](https://huggingface.co/onnx-community/whisper-large-v3-turbo_timestamped), de onnx-community.
 - **Fuentes** Atkinson Hyperlegible e IBM Plex Mono, desde Google Fonts.
 
-Si cambias de versión de transformers.js, actualiza también `RUNTIME.wasmSize` en `js/app.js`. Ese tamaño solo se usa para la barra de progreso.
+Si cambias de versión de transformers.js, actualiza también `RUNTIME.wasmSize` en `js/transcribe/models.js`. Ese tamaño solo se usa para la barra de progreso.
 
-Para añadir otro modelo, agrégalo a `MODELS` en `js/app.js` y su texto a `MODEL_INFO`. Cada modelo necesita:
+Para añadir otro modelo, agrégalo a `MODELS` en `js/transcribe/models.js` y su texto a `MODEL_INFO`. `npm test` comprueba que los tamaños cuadren y prueba la elección de modelo en distintos equipos. Cada modelo necesita:
 - sus archivos comunes y una o más variantes (CPU o GPU), con la lista exacta de archivos y su tamaño en bytes;
 - `auto`, el dispositivo que prefiere Auto;
 - y, si hace falta, `limits`, para desactivarlo o advertir en teléfonos y tablets, o exigir una memoria mínima.

@@ -13,12 +13,12 @@ const TYPES = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; char
 const asOnPages = {
   name: 'apuntador-as-on-pages',
   configureServer(server) {
-    // Serve js/ and css/ byte for byte, as GitHub Pages does. Vite would otherwise rewrite them: in
-    // js/worker.js it turns `import(runtime.lib)` into a helper plus a static import, which a classic
-    // worker cannot load.
+    // Serve js/ and css/ (subfolders included) byte for byte, as GitHub Pages does. Vite would otherwise
+    // rewrite them: in js/transcribe/worker.js it turns `import(runtime.lib)` into a helper plus a static
+    // import of its own client, which the worker cannot load.
     server.middlewares.use((req, res, next) => {
       const path = decodeURIComponent((req.url || '').split('?')[0]);
-      if (!/^\/(js|css)\/[^/]+\.(js|css)$/.test(path)) return next();
+      if (!/^\/(js|css)\/(?:[\w-]+\/)*[\w.-]+\.(js|css)$/.test(path)) return next();
       const file = resolve(root, '.' + path);
       if (!file.startsWith(root + sep) || !existsSync(file) || !statSync(file).isFile()) return next();
       res.setHeader('Content-Type', TYPES[extname(file)]);

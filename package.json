@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "node --test tests/",
     "dev:lan": "vite --mode lan"
   },
   "devDependencies": {

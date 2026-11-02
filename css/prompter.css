@@ -1,0 +1,35 @@
+/* The prompter: the lines, the reading arrow at 40%, the word-by-word highlight, and the empty screen. */
+main{position:relative;height:max(340px,calc(100vh - var(--chrome,260px) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));height:max(340px,calc(100dvh - var(--chrome,260px) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)))}
+.scroller{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;
+  -webkit-mask-image:linear-gradient(transparent 0,#000 18%,#000 78%,transparent 100%);mask-image:linear-gradient(transparent 0,#000 18%,#000 78%,transparent 100%)}
+.cues{position:relative;max-width:26em;margin:0 auto;padding-block:calc(var(--sh,60vh) * .4) calc(var(--sh,60vh) * .55);font-size:var(--fs);line-height:1.38;transition:transform .25s}
+.mirror .cues{transform:scaleX(-1)}
+.cue{margin:0 0 .35em;padding:.18em .45em;border-radius:.25em;color:var(--ink-soft);cursor:pointer;transition:color .25s,background-color .25s;text-wrap:pretty}
+.cue:hover{background:color-mix(in srgb,var(--cue-wash) 60%,transparent)}
+.cue.past{color:var(--ink-dim)}
+.cue.active{color:var(--ink);background:var(--cue-wash)}
+.cue.pending{cursor:default;font-size:.6em;font-style:italic;color:var(--ink-dim)}
+.cue.pending.active{color:var(--ink-soft)}
+.cue.pending::after{content:"";display:inline-block;width:.6em;height:.6em;margin-left:.4em;border-radius:50%;background:var(--cue);vertical-align:middle;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.tc{display:block;font-family:var(--f-mono);font-size:max(11px,.3em);letter-spacing:.04em;color:var(--ink-dim);margin-bottom:.15em;font-variant-numeric:tabular-nums}
+.cue.active .tc{color:var(--cue)}
+.karaoke .cue.active .w{color:var(--ink-soft);transition:color .12s}
+.karaoke .cue.active .w.on,.karaoke .cue.active .w.now{color:var(--ink)}
+.karaoke .cue.active .w.now{text-decoration:underline;text-decoration-color:var(--cue);text-decoration-thickness:.08em;text-underline-offset:.18em}
+.reading{position:absolute;left:0;right:0;top:40%;height:0;pointer-events:none}
+.reading::before,.reading::after{content:"";position:absolute;top:-7px;border:7px solid transparent}
+.reading::before{left:max(4px,env(safe-area-inset-left,0px));border-left-color:var(--cue)}
+.reading::after{right:max(4px,env(safe-area-inset-right,0px));border-right-color:var(--cue)}
+
+/* Empty screen */
+.empty{position:absolute;inset:0;display:flex;overflow-y:auto;text-align:center;padding:24px}
+.empty>div{margin:auto;max-width:30em;display:grid;gap:10px;justify-items:center}
+.empty h2{margin:0;font-size:22px;text-wrap:balance}
+.empty p{margin:0;color:var(--ink-soft);line-height:1.5}
+.empty .nacts{margin:6px 0 0;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+/* An audio's saved texts, to pick one */
+.choices{display:grid;gap:8px;width:min(26em,calc(100vw - 48px));margin-top:6px}
+.choice{display:grid;gap:5px;text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:12px 14px;cursor:pointer;min-width:0;font:inherit}
+.choice:hover,.choice:focus-visible{border-color:var(--cue)}
+.follow{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);border:0;border-radius:999px;padding:10px 18px;background:var(--ink);color:var(--bg);font-size:14px;font-weight:700;cursor:pointer;box-shadow:var(--shadow);display:flex;gap:8px;align-items:center;white-space:nowrap}

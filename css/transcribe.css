@@ -1,0 +1,26 @@
+/* The transcription window, and its progress in the notice bar. */
+.modal{position:fixed;z-index:16;left:50%;top:max(16px,calc(50% - 300px));transform:translateX(-50%);width:min(480px,calc(100vw - 32px));max-height:calc(100% - 32px);overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:20px;display:grid;gap:16px}
+.modal-hd{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:-8px -10px -6px 0}
+.modal h2{margin:0;font-size:19px}
+.models{display:grid;gap:8px;border:0;margin:0;padding:0;min-width:0}
+.models legend{padding:0;margin-bottom:8px;font-size:14px}
+.model{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:3px 12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.model:has(input:checked){border-color:var(--cue);background:var(--cue-wash)}
+.model:has(input:disabled){cursor:not-allowed;opacity:.6}
+.model .tag{display:inline-block;vertical-align:2px;margin-left:2px;padding:1px 6px;border:1px solid var(--line);border-radius:4px;font-family:var(--f-mono);font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+.model .tag.rec{border-color:var(--cue);color:var(--cue)}
+.model .mt .warn{font-style:normal;color:var(--tally)}
+.model input{grid-row:1/3;width:18px;height:18px;margin:0;accent-color:var(--cue)}
+.model b{font-size:15px}
+.model .mt{grid-column:2}
+.model .st{grid-row:1/3;grid-column:3;display:grid;justify-items:end;gap:4px;font-family:var(--f-mono);font-size:11.5px;color:var(--ink-soft);text-align:right}
+.model .st.ok{color:var(--cue)}
+.link{border:0;background:none;padding:0;color:var(--ink-soft);text-decoration:underline;cursor:pointer;font-family:var(--f-read);font-size:12.5px}
+.field{display:grid;gap:6px;font-size:14px}
+.field select{font:inherit;font-size:15px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--raise);color:var(--ink)}
+.fine{margin:0;font-size:13px;line-height:1.5;color:var(--ink-soft)}
+.fine strong{color:var(--ink)}
+.modal-acts{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.prog{flex:1 1 140px;min-width:120px;max-width:320px;height:5px;border-radius:3px;background:var(--line);overflow:hidden;align-self:center}
+.prog i{display:block;height:100%;width:0;background:var(--cue);transition:width .3s}
+.notice .tx-msg{font-variant-numeric:tabular-nums}
