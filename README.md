@@ -9,7 +9,7 @@ Es una página estática (HTML, CSS y JavaScript sin dependencias de build), lis
 - Seguimiento automático de la línea activa, con resaltado palabra a palabra. Es exacto en lo transcrito con tiempos por palabra; en los SRT, se estima.
 - Toca una línea para saltar a ese momento. Si te desplazas a mano, el seguimiento se pausa hasta que pulses «Volver a la línea actual».
 - Tamaño de letra, velocidad (0,75× a 2×), ajuste de sincronía en décimas de segundo y modo espejo para cristales de teleprompter.
-- Biblioteca: cada guion se guarda con el punto donde te quedaste, y su audio se reabre solo.
+- Biblioteca por audio: cada audio se guarda con todos sus textos (SRT y transcripciones de distintos modelos), cada uno con el punto donde te quedaste. Al volver a cargar un audio aparecen sus textos para elegir.
 - Transcripción con Whisper en español, inglés, portugués, francés, italiano, alemán o detección automática. Los modelos disponibles están en la tabla de abajo.
 
 ### Modelos de transcripción
@@ -35,7 +35,7 @@ Los modelos son las versiones [`_timestamped`](https://huggingface.co/onnx-commu
 Con **Ajustes → Transcripción → Tiempos por palabra** activado (lo está por defecto), Whisper devuelve cuándo empieza cada palabra:
 - **El resaltado sigue la voz real.** Sin esta opción, la app reparte la duración de cada línea entre sus palabras, que es lo que sigue haciendo con los SRT.
 - **Cómo se arman las líneas:** las palabras se agrupan cortando en las pausas, al final de cada oración, en una coma si la línea ya es larga, o como mucho a las 20 palabras.
-- **Se guardan en la biblioteca** junto con el guion.
+- **Se guardan en la biblioteca** junto con el texto.
 - **Coste:** la transcripción tarda entre un 6 y un 12 % más. Si va lenta, desactiva la opción: vuelve al modo por frases y usa los mismos archivos, sin descargar nada.
 
 **Large v3 Turbo** necesita WebGPU con soporte de 16 bits (`shader-f16`): Chrome o Edge recientes, y Safari 26 o posterior. Usa el codificador en fp16 y el decodificador en 4 bits, la misma combinación que la demo oficial de Hugging Face.
@@ -72,26 +72,38 @@ Además:
 
 Large v3 completo tampoco está: pesa el doble que Turbo y es mucho más lento, con una precisión casi igual.
 
+### Biblioteca: cada audio con sus textos
+
+La biblioteca se organiza por audio. Cada audio que cargas se guarda una sola vez y puede tener varios textos: su SRT, una transcripción por cada modelo de Whisper que pruebes, otra versión corregida… Cada texto recuerda el punto donde te quedaste.
+
+- **Al cargar un audio** que ya usaste, la pantalla lista sus textos guardados para elegir cuál leer. Si no tiene ninguno, ofrece transcribirlo o elegir su SRT, y lo que hagas queda guardado junto al audio.
+- **Al recargar la página** vuelve lo último que tenías: un texto con su audio, o un audio solo con su lista de textos.
+- **En la biblioteca** pulsas un audio para cargarlo y ver sus textos, o un texto para abrirlo directamente. Si cambias a otro texto del mismo audio mientras suena, el audio sigue donde iba, sin pausas.
+- **Cada texto se descarga como `.srt`** con el botón de la flecha: así sacas del navegador lo que escribió Whisper.
+- **Borrar un audio** borra también todos sus textos. Borrar un texto deja el audio y sus otros textos.
+- **Un audio se reconoce por su nombre y tamaño.** Si lo vuelves a elegir desde otra carpeta es el mismo; si lo renombras o lo vuelves a exportar, cuenta como otro.
+- **Los textos cuyo audio no está guardado** (por falta de espacio, o de versiones anteriores de la app) aparecen al final, en «Textos sin audio guardado». Al elegirles un audio pasan a ese audio.
+
 ### Cómo se emparejan el audio y el texto
 
-Cada audio pertenece a un guion, o a ninguno todavía. La app solo los une cuando no hay duda, para que nunca se mezcle el texto de un audio con otro.
+La app solo une un texto con un audio cuando no hay duda, para que nunca se mezcle el texto de un audio con otro.
 
 | Haces esto | Pasa esto |
 | --- | --- |
-| Eliges un audio y después su SRT (o al revés) | Quedan emparejados y guardados en la biblioteca |
-| Eliges **otro audio** con un guion abierto que ya tiene el suyo | Empieza de cero: el guion se cierra (sigue en la biblioteca) y la pantalla pide el texto del audio nuevo. Si la biblioteca tiene un guion usado con un audio del mismo nombre, lo sugiere |
+| Eliges un audio y después su SRT (o al revés) | El SRT queda guardado como un texto de ese audio |
+| Eliges **otro audio** con un texto abierto que ya tiene el suyo | El texto se cierra (sigue en la biblioteca) y la pantalla lista los textos del audio nuevo, o pide uno si no tiene |
 | Eliges un SRT que ya tiene su audio guardado | Se abre con **su** audio, aunque sonara otro |
-| Eliges un SRT nuevo mientras suena el audio de otro guion | Se abre **sin** ese audio. El aviso ofrece «Elegir audio» o «Usar …», por si era el mismo audio |
+| Eliges un SRT nuevo mientras está abierto un texto de otro audio | Se abre **sin** ese audio. El aviso ofrece «Elegir audio» o «Usar …», por si también era de ese audio |
 | Arrastras un audio y un SRT **juntos** | Van juntos |
-| Abres un guion de la biblioteca | Se abre con su audio guardado. Si no tiene, quita el que sonara de otro guion |
+| Abres un texto de la biblioteca | Se abre con su audio guardado. Si no tiene, quita el que sonara de otro texto |
 | Vuelves a elegir el mismo audio | Avisa de que ya está cargado y no cambia nada |
-| Borras el guion abierto | La pantalla queda vacía y el audio sigue cargado, ya sin guion |
+| Borras el texto abierto | El audio sigue cargado y la pantalla lista sus otros textos |
 
 **Mientras se transcribe:**
 - **Las líneas van apareciendo** y puedes escuchar el audio a la vez.
 - **Si el audio adelanta a la transcripción,** la línea actual pasa a ser «Transcribiendo… lo que sigue a 0:24 aparecerá aquí», en vez de quedarse marcada la última línea transcrita. En cuanto llegan las líneas nuevas, el resaltado salta a la que corresponde.
-- **Al terminar,** el audio sigue sonando donde iba, sin pausas ni saltos, y la transcripción se guarda como un guion con su audio.
-- **Si cancelas, falla o cargas otra cosa,** vuelve el guion que había antes. Abrir un guion de la biblioteca también cancela la transcripción.
+- **Al terminar,** el audio sigue sonando donde iba, sin pausas ni saltos, y la transcripción se guarda como un texto más de ese audio, junto a los que ya tuviera.
+- **Si cancelas, falla o cargas otra cosa,** vuelve el texto que había antes. Abrir un texto de la biblioteca también cancela la transcripción.
 
 ### Teclado
 
@@ -161,9 +173,11 @@ Todo queda en el navegador de quien usa la app. No hay servidor propio ni cuenta
 
 | Qué | Dónde |
 | --- | --- |
-| Ajustes, lista de guiones, líneas y posición | `localStorage` |
-| Archivos de audio de la biblioteca | IndexedDB (base `apuntador`) |
+| Ajustes, lista de audios y textos, líneas de cada texto y posición | `localStorage` |
+| Archivos de audio de la biblioteca (uno por audio, aunque tenga varios textos) | IndexedDB (base `apuntador`) |
 | Modelos Whisper y runtime WASM | Cache Storage (`transformers-cache` y `apuntador-runtime`) |
+
+Los textos ocupan poco: `localStorage` admite unos 5 MB por sitio, suficiente para decenas de horas de transcripción. Los audios van aparte, en IndexedDB, que usa el espacio libre del disco. Si un audio no cabe, la app avisa y su texto se guarda igual.
 
 Los modelos se descargan **una sola vez**. Desde el diálogo de transcripción puedes borrar cada modelo para liberar espacio.
 

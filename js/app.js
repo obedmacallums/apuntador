@@ -17,13 +17,12 @@ let mode = 'demo';                      // 'demo' = simulated clock, 'audio' = r
 const demo = { t: 0, playing: false, last: 0 };
 let active = -2, lit = -1, lastT = -1, dirty = true, follow = true, dragging = false;
 let userSrt = false, audioUrl = null, triedDataUrl = false, wakeLock = null;
-let library = [], currentId = null, currentMeta = null;   // saved scripts; the one on screen
+let library = [], audios = [], currentId = null, currentMeta = null;   // saved texts and audios; the text on screen
 let resumeFrom = 0, pendingSeek = null, lastSavedPos = -1, saveTimer = 0;
-// Which script the loaded audio belongs to. null: an audio loaded on its own, not tied to any text yet.
-// Audio and text only get paired when that is unambiguous, so one never ends up with the other's file.
-let audioOwner = null;
+// Each audio can have several texts (its own SRT, one per Whisper model…): a text names its audio by
+// audioKey. Audio and text only get paired when that is unambiguous, so one never ends up with the
+// other's file. With an audio loaded and no text open, the screen lists that audio's texts.
 let spareAudio = null;     // the last audio set aside, so "Usar «…»" can bring it back in one tap
-let suggestion = null;     // a library script whose audio has the same name as the one just loaded
 let pendingEl = null;      // "still transcribing" line after the last transcribed one
 
 /* ---------- SRT / VTT parsing ---------- */
@@ -60,7 +59,7 @@ function sampleCues() {
     'En Ajustes cambias el tamaño de la letra, la velocidad o activas el modo espejo.',
     'Si la voz y el texto no coinciden, corrige la sincronía en décimas de segundo.',
     'En el teclado, la barra espaciadora reproduce o pausa y las flechas te mueven.',
-    'Cada guion se guarda en tu biblioteca y la próxima vez sigues donde lo dejaste.'
+    'Cada audio se guarda en tu biblioteca con sus textos, y la próxima vez sigues donde lo dejaste.'
   ];
   let t = 0.6;
   return lines.map(text => {
@@ -183,18 +182,30 @@ function renderSegs() {
 function updateEmpty() {
   const show = !cues.length && !TX.live;
   $('empty').hidden = !show;
+  const box = $('emptyList');
+  box.textContent = '';
   if (!show) return;
-  $('emptyLib').hidden = !library.length;
+  // An audio on its own: the texts already saved for it, to pick one, plus ways to make another.
+  const mine = mode === 'audio' && !TX.running ? textsFor(loadedKey()) : [];
+  box.hidden = !mine.length;
+  $('emptyLib').hidden = !library.length || mine.length > 0;
   $('emptyTx').hidden = mode !== 'audio' || TX.running;
+  $('emptyTx').textContent = mine.length ? 'Transcribir con otro modelo' : 'Transcribir con Whisper';
+  $('emptyTx').classList.toggle('primary', !mine.length);
   if (TX.running) {
     $('emptyTitle').textContent = 'Preparando la transcripción…';
     $('emptyText').textContent = 'El texto irá apareciendo aquí a medida que Whisper lo transcriba. Puedes reproducir el audio mientras tanto.';
+  } else if (mine.length) {
+    $('emptyTitle').textContent = mine.length === 1 ? 'Este audio ya tiene un texto' : `Este audio tiene ${mine.length} textos`;
+    $('emptyText').textContent = 'Elige cuál leer, o crea otro: transcríbelo con otro modelo o elige su archivo .srt.';
+    mine.forEach(m => box.append(textButton(m, textLabel(m), 'choice')));
   } else if (mode === 'audio') {
     $('emptyTitle').textContent = 'Falta el texto de este audio';
-    $('emptyText').textContent = 'Transcríbelo aquí mismo con Whisper, elige su archivo .srt o abre un guion de tu biblioteca.';
+    $('emptyText').textContent = (storedAudio.has(loadedKey()) ? 'El audio ya está en tu biblioteca. ' : '')
+      + 'Transcríbelo aquí mismo con Whisper o elige su archivo .srt: el texto quedará guardado junto al audio.';
   } else {
     $('emptyTitle').textContent = 'Elige qué leer';
-    $('emptyText').textContent = 'Elige un audio y su archivo .srt, arrástralos a la ventana o abre un guion de tu biblioteca.';
+    $('emptyText').textContent = 'Elige un audio y su archivo .srt, arrástralos a la ventana o abre algo de tu biblioteca.';
   }
 }
 
@@ -304,9 +315,17 @@ audio.addEventListener('error', () => {
 const isSub = f => /\.(srt|vtt)$/i.test(f.name);
 const isAudio = f => (f.type || '').startsWith('audio/') || /\.(mp3|m4a|wav|ogg|oga|aac|flac|opus|weba)$/i.test(f.name);
 
-// Same name and byte size: the same recording picked again (dates change when files are copied around).
-const sameFile = (a, b) => !!a && !!b && a.name === b.name && a.size === b.size;
+// An audio is known by its name and byte size: the same recording picked again gets the same key
+// (dates change when files are copied around).
+const keyOf = f => 'a' + hash(f.name + '\n' + f.size);
 const resetSrtSlot = () => { $('srtName').textContent = 'Elegir SRT'; $('slotSrt').classList.remove('ok'); };
+const loadedKey = () => mode === 'audio' && audio._file ? audio._key : null;
+// The audio playing is the open text's own.
+const ownsAudio = () => !!currentId && !!currentMeta.audioKey && currentMeta.audioKey === loadedKey();
+// The texts saved for an audio, most recently used first.
+const textsFor = key => key ? library.filter(m => m.audioKey === key) : [];
+// What a text is called next to its audio: the Whisper model that wrote it, or its file name.
+const textLabel = m => m.via || ((m.file || '').match(/\((Whisper [^)]+)\)$/) || [])[1] || m.file || m.name;
 
 // Put a file in the player. keepPos stays at the current second (giving audio to the text on screen).
 function setAudio(f, keepPos) {
@@ -315,7 +334,7 @@ function setAudio(f, keepPos) {
   if (audioUrl) URL.revokeObjectURL(audioUrl);
   audioUrl = URL.createObjectURL(f);
   triedDataUrl = false;
-  audio._file = f;
+  audio._file = f; audio._key = keyOf(f);
   audio.src = audioUrl;
   audio.playbackRate = S.rate;
   audio.load();
@@ -334,45 +353,54 @@ function unloadAudio() {
   spareAudio = audio._file;
   audio.removeAttribute('src'); audio.load();
   if (audioUrl) URL.revokeObjectURL(audioUrl);
-  audioUrl = null; audio._file = null; audioOwner = null;
+  audioUrl = null; audio._file = null; audio._key = null;
   mode = 'demo'; demo.t = t; demo.playing = false;
   $('audioName').textContent = 'Elegir MP3'; $('slotAudio').classList.remove('ok');
   updateTxBtn(); dirty = true; onPlayState();
 }
-// The loaded audio now belongs to the open script: remember it in the library and in this browser.
+// The loaded audio now belongs to the open text: it joins that audio's texts in the library.
 function pairAudio(f, quiet) {
   if (!currentId) return;
-  audioOwner = currentId;
+  const key = keyOf(f);
   if (spareAudio === f) spareAudio = null;
-  if (currentMeta.audioName !== f.name) { currentMeta.audioName = f.name; Store.patch(currentId, { audioName: f.name }); }
-  saveAudio(currentId, f, quiet);
+  if (currentMeta.audioKey !== key || currentMeta.audioName !== f.name) {
+    currentMeta.audioKey = key; currentMeta.audioName = f.name;
+    Store.patch(currentId, { audioKey: key, audioName: f.name });
+  }
+  rememberAudio(f, quiet ? '' : 'Audio guardado en tu biblioteca: la próxima vez se abrirá con su texto.');
   updateNotice(); renderLib();
 }
-// Close the script on screen. It stays in the library; the next visit will not reopen it.
+// Close the text on screen. It stays in the library. An audio left in the player is what the next
+// visit reopens, with the list of its texts.
 function closeScript() {
   persistPos(0);
-  cues = []; userSrt = false; currentId = null; currentMeta = null; resumeFrom = 0; audioOwner = null;
+  cues = []; userSrt = false; currentId = null; currentMeta = null; resumeFrom = 0;
   render(); resetSrtSlot();
-  Store.setLast(null);
+  const key = loadedKey();
+  Store.setLast(key && storedAudio.has(key) ? key : null);
   updateNotice(); renderLib();
 }
 
-// A new audio file. It joins the open text only when that text has no audio of its own loaded
-// (the "choose the SRT, then its MP3" flow). Otherwise it is a different recording: start over.
+// A new audio file. It joins the open text only when that text is still waiting for its audio
+// (the "choose the SRT, then its MP3" flow). Otherwise it is another recording: the text closes and
+// the screen lists the texts already saved for this audio, if any.
 function chooseAudio(f) {
-  if (mode === 'audio' && sameFile(audio._file, f)) { toast('Ese audio ya está cargado.'); return; }
-  if (currentId && !(mode === 'audio' && audioOwner === currentId)) {
-    const before = currentMeta.audioName;
+  const key = keyOf(f);
+  if (loadedKey() === key) { toast('Ese audio ya está cargado.'); return; }
+  const waiting = currentId && !ownsAudio() && currentMeta.audioKey !== key
+    && !(currentMeta.audioKey && storedAudio.has(currentMeta.audioKey));   // its own audio is saved: this one is another
+  if (currentId && (waiting || currentMeta.audioKey === key)) {
+    const before = currentMeta.audioName, other = !!before && before !== f.name;
     setAudio(f, true);
-    pairAudio(f);
-    if (before && before !== f.name) toast(`Lo uso con «${currentMeta.name}», aunque antes iba con «${before}».`);
+    pairAudio(f, other);   // quiet when warning, so the warning stays on screen
+    if (other) toast(`Lo uso con «${currentMeta.name}», aunque antes iba con «${before}».`);
     return;
   }
   const closed = currentId ? currentMeta.name : '';
   closeScript();
   setAudio(f, false);
-  suggestion = library.find(m => m.audioName === f.name) || null;
-  updateNotice(); updateEmpty();
+  updateNotice();
+  rememberAudio(f).then(ok => { if (ok && !currentId && loadedKey() === key) Store.setLast(key); });
   if (closed) toast(`Audio nuevo: cerré «${closed}», que sigue en tu biblioteca.`);
 }
 
@@ -392,27 +420,28 @@ async function chooseSubs(f, withAudio) {
     dur: c[c.length - 1].end, pos: 0, audioName: '', createdAt: t, updatedAt: t
   };
   const loaded = mode === 'audio';
-  const same = loaded && audioOwner === id;              // its own audio is already playing
-  const stored = !same && !withAudio && audioIds.has(id); // its own audio is saved in this browser
-  const pair = loaded && !same && (withAudio || (!stored && audioOwner === null));
-  const setAside = loaded && !same && !pair && !stored;   // the loaded audio belongs to another text
+  const same = loaded && !!meta.audioKey && meta.audioKey === loadedKey();          // its own audio is already playing
+  const stored = !same && !withAudio && !!meta.audioKey && storedAudio.has(meta.audioKey); // its own audio is saved
+  // The loaded audio is free (no text open, so the screen was asking for its text): this SRT is one of its texts.
+  const pair = loaded && !same && (withAudio || (!stored && !currentId));
+  const setAside = loaded && !same && !pair && !stored;   // the loaded audio goes with the text that was open
   const aside = setAside ? audio._file.name : '';
   if (setAside) unloadAudio();
-  openScript(meta, c, pair);
+  openScript(meta, c, pair || same);
   if (pair) pairAudio(audio._file, true);
-  else if (stored && !(await restoreAudio(id)) && mode === 'audio' && audioOwner !== id) unloadAudio();
+  else if (stored && !(await restoreAudio(currentMeta)) && currentId === id && mode === 'audio' && !ownsAudio()) unloadAudio();
   if (!saved && Store.kind !== 'none') {
-    try { await Store.save({ ...meta, audioName: currentMeta.audioName || '' }, c); renderLib(); }
+    try { await Store.save({ ...meta, audioName: currentMeta.audioName || '', audioKey: currentMeta.audioKey || '' }, c); renderLib(); }
     catch (e) {
       const full = e && (e.code === 'quota_exceeded' || e.name === 'QuotaExceededError');
-      toast(full ? 'No queda espacio para guardar más guiones. Borra alguno de la biblioteca.'
-                 : 'El guion está abierto, pero no pude guardarlo en la biblioteca.');
+      toast(full ? 'No queda espacio para guardar más textos. Borra alguno de la biblioteca.'
+                 : 'El texto está abierto, pero no pude guardarlo en la biblioteca.');
       return;
     }
   } else if (saved) Store.patch(id, { updatedAt: t });
   if (currentId !== id) return;
   const where = saved ? 'Ya estaba en tu biblioteca.' : `Guardado en tu biblioteca: ${c.length} líneas.`;
-  toast(aside ? `${where} Quité «${aside}» porque era de otro guion; si es el mismo audio, pulsa «Usar ${aside}».`
+  toast(aside ? `${where} Quité «${aside}» porque va con otro texto; si también es de este, pulsa «Usar ${aside}».`
     : `${where}` + (resumeFrom ? ` Seguimos en ${fmt(resumeFrom)}.` : mode === 'audio' ? ' Pulsa reproducir.' : ' Elige su audio para escucharlo.'));
 }
 
@@ -581,12 +610,31 @@ const Store = {
       const v = JSON.parse(localStorage.getItem(LS_LIB) || 'null');
       this.local = v && v.scripts ? v : { last: null, scripts: {} };
     } catch (e) { this.local = { last: null, scripts: {} }; }
+    if (!this.local.audios) this.local.audios = {};
     this.syncLocal(false);
   },
   syncLocal(write = true) {
     if (write) localStorage.setItem(LS_LIB, JSON.stringify(this.local));
     library = Object.values(this.local.scripts).sort((a, b) => b.updatedAt - a.updatedAt);
+    audios = Object.values(this.local.audios);
     renderLib();
+  },
+  // Audios: { key, name, size, type, dur, addedAt, usedAt }. The file itself is in AudioStore.
+  audio(key) { return this.local && this.local.audios[key] || null; },
+  putAudio(a) {
+    if (this.kind !== 'local') return;
+    this.local.audios[a.key] = { ...(this.local.audios[a.key] || {}), ...a };
+    try { this.syncLocal(); } catch (e) {}
+  },
+  removeAudio(key) {
+    if (this.kind !== 'local') return;
+    for (const m of Object.values(this.local.scripts)) if (m.audioKey === key) {
+      localStorage.removeItem(LS_SCRIPT + m.id); delete this.local.scripts[m.id];
+      if (this.local.last === m.id) this.local.last = null;
+    }
+    delete this.local.audios[key];
+    if (this.local.last === key) this.local.last = null;
+    this.syncLocal();
   },
   async getMeta(id) {
     const m = this.local && this.local.scripts[id];
@@ -623,7 +671,8 @@ const Store = {
   }
 };
 
-/* Audio files live in this browser too (IndexedDB), keyed by script id: localStorage is far too small for them. */
+/* Audio files live in this browser too (IndexedDB), keyed by audio key: localStorage is far too small
+   for them. Each audio is stored once, however many texts it has. */
 const AudioStore = {
   open() {
     if (!this.p) this.p = new Promise((res, rej) => {
@@ -647,42 +696,89 @@ const AudioStore = {
   del(id) { return this.run('readwrite', s => s.delete(id)); },
   keys() { return this.run('readonly', s => s.getAllKeys()); }
 };
-const audioIds = new Set();
-const savedNow = new Map();   // script id → file stored this session, so the same file is not written twice
-async function saveAudio(id, f, quiet) {
-  if (savedNow.get(id) === f && audioIds.has(id)) return;
-  try {
-    await AudioStore.put(id, f);
-    audioIds.add(id); savedNow.set(id, f); renderLib();
-    if (!quiet) toast('Audio guardado en este navegador. La próxima vez se abrirá solo con su guion.');
-  } catch (e) {
-    toast(e && e.name === 'QuotaExceededError'
-      ? 'Este navegador no tiene espacio para guardar el audio. Borra guiones que ya no uses.'
-      : 'El audio suena, pero este navegador no permitió guardarlo.');
-  }
+const storedAudio = new Set();   // audio keys whose file is saved in this browser
+const saving = new Map();         // audio key → the write in progress, so the same file is not written twice
+const fileOf = rec => new File([rec.blob], rec.name || 'audio', { type: rec.type || rec.blob.type });
+// Keep an audio in the library. Resolves to whether its file is saved in this browser.
+function rememberAudio(f, msg) {
+  const key = keyOf(f), t = Date.now();
+  const dur = audio._key === key && isFinite(audio.duration) ? audio.duration : undefined;
+  const entry = { key, name: f.name, size: f.size, type: f.type, usedAt: t, ...(dur ? { dur } : {}) };
+  if (storedAudio.has(key)) { Store.putAudio(entry); return Promise.resolve(true); }
+  if (!saving.has(key)) saving.set(key, (async () => {
+    try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+    try {
+      await AudioStore.put(key, f);
+      storedAudio.add(key);
+      Store.putAudio({ addedAt: (Store.audio(key) || {}).addedAt || t, ...entry });
+      if (msg) toast(msg);
+      return true;
+    } catch (e) {
+      toast(e && e.name === 'QuotaExceededError'
+        ? 'Este navegador no tiene espacio para guardar el audio. Borra audios que ya no uses de tu biblioteca.'
+        : 'El audio suena, pero este navegador no permitió guardarlo.');
+      return false;
+    } finally { saving.delete(key); }
+  })());
+  return saving.get(key);
 }
-// Bring back the audio saved for a script. Returns whether the script now has its own audio playing.
-async function restoreAudio(id) {
+audio.addEventListener('loadedmetadata', () => {
+  const key = loadedKey(), a = key && Store.audio(key);
+  if (a && isFinite(audio.duration) && !a.dur) Store.putAudio({ key, dur: audio.duration });
+});
+// Bring back the audio saved for a text. Returns whether that text now has its own audio playing.
+async function restoreAudio(meta) {
+  const key = meta.audioKey;
+  if (!key) return false;
+  if (loadedKey() === key) return currentId === meta.id;
   let rec = null;
-  try { rec = await AudioStore.get(id); } catch (e) {}
-  if (currentId !== id) return false;
-  if (mode === 'audio' && audioOwner === id) return true;
-  if (!rec || !rec.blob) return false;
-  const f = new File([rec.blob], rec.name || 'audio', { type: rec.type || rec.blob.type });
-  savedNow.set(id, f);
-  setAudio(f, true);
-  audioOwner = id;
+  try { rec = await AudioStore.get(key); } catch (e) {}
+  if (currentId !== meta.id) return false;
+  if (loadedKey() === key) return true;
+  if (!rec || !rec.blob) { storedAudio.delete(key); renderLib(); return false; }
+  setAudio(fileOf(rec), true);
   updateNotice(); renderLib();
   return true;
 }
-AudioStore.keys().then(ks => { ks.forEach(k => audioIds.add(k)); renderLib(); }).catch(() => {});
+// Load a saved audio on its own: the screen lists its texts, or offers to make one.
+async function openAudio(key) {
+  if (loadedKey() === key) {
+    if (!TX.live && currentId) closeScript();
+    closeLib(); return;
+  }
+  let rec = null;
+  try { rec = await AudioStore.get(key); } catch (e) {}
+  if (!rec || !rec.blob) { storedAudio.delete(key); renderLib(); toast('Este audio ya no está guardado en el navegador. Elígelo de nuevo.'); return; }
+  if (TX.running) txCancel('Transcripción cancelada: abriste otro audio.');
+  closeScript();
+  setAudio(fileOf(rec), false);
+  Store.putAudio({ key, name: rec.name || 'audio', size: rec.blob.size, type: rec.type || rec.blob.type, usedAt: Date.now() });
+  Store.setLast(key);
+  updateNotice(); closeLib();
+}
+// Before audios had a library of their own, each text kept its own copy, keyed by the text's id.
+// Move those to one copy per audio and point the texts to it. Safe to run again if interrupted.
+async function migrateAudio() {
+  for (const k of await AudioStore.keys()) {
+    if (typeof k === 'string' && k[0] === 'a') { storedAudio.add(k); continue; }
+    const rec = await AudioStore.get(k);
+    if (rec && rec.blob) {
+      const f = fileOf(rec), key = keyOf(f);
+      if (!storedAudio.has(key)) { await AudioStore.put(key, f); storedAudio.add(key); }
+      const t = rec.savedAt || Date.now();
+      Store.putAudio({ key, name: f.name, size: f.size, type: f.type, addedAt: (Store.audio(key) || {}).addedAt || t, usedAt: t });
+      Store.patch(k, { audioKey: key, audioName: f.name });
+    }
+    await AudioStore.del(k);
+  }
+  renderLib();
+}
 
 // Show a script. keepPlayback: do not pause or jump (the audio playing already goes with this text).
 function openScript(meta, list, keepPlayback) {
   if (!keepPlayback) pause();
   cues = list; userSrt = true;
   currentId = meta.id; currentMeta = { ...meta };
-  suggestion = null;
   if (mode === 'demo' && !keepPlayback) demo.t = 0;
   render();
   $('srtName').textContent = meta.file || meta.name; $('slotSrt').classList.add('ok');
@@ -723,13 +819,8 @@ function updateNotice() {
   txt.textContent = ''; acts.textContent = '';
   const strong = s => { const b = document.createElement('strong'); b.textContent = s; return b; };
   if (!currentId) {
-    if (mode === 'audio' && suggestion) {
-      // The library has a script that was used with an audio of this same name.
-      const m = suggestion;
-      txt.append('Tu biblioteca tiene ', strong(m.name), `, que se usó con un audio llamado ${m.audioName}.`);
-      acts.append(nbtn('Abrir ese guion', () => openFromLib(m), true));
-      box.hidden = false;
-    } else if (mode === 'demo' && !userSrt && cues.length) {
+    // An audio on its own needs no notice: the screen itself lists its texts or offers to make one.
+    if (mode === 'demo' && !userSrt && cues.length) {
       txt.append(strong('Este texto es solo un ejemplo.'), ' Para ver el de tu audio necesitas su archivo .srt: elige el audio y el SRT arriba, o arrástralos a la ventana.');
       box.hidden = false;
     } else box.hidden = true;
@@ -759,67 +850,148 @@ function ago(ts) {
   return '';
 }
 const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+const DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>';
+const NOTE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>';
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const toSrt = list => list.map((c, i) => `${i + 1}\n${fmtTC(c.start)} --> ${fmtTC(c.end)}\n${c.text}\n`).join('\n');
+
+// A delete button that asks for a second tap before doing anything.
+function delBtn(label, armedText, onConfirm) {
+  const del = el('button', 'del');
+  const reset = () => { del.classList.remove('armed'); del.innerHTML = TRASH; del.setAttribute('aria-label', label); del.title = 'Borrar'; };
+  reset();
+  del.onclick = async () => {
+    if (!del.classList.contains('armed')) {
+      del.classList.add('armed'); del.textContent = armedText;
+      del.setAttribute('aria-label', 'Confirmar: ' + label[0].toLowerCase() + label.slice(1));
+      setTimeout(() => { if (del.isConnected) reset(); }, 3500);
+      return;
+    }
+    try { await onConfirm(); } catch (e) { toast('No pude borrarlo. Prueba de nuevo en unos segundos.'); }
+  };
+  return del;
+}
+const progress = m => {
+  const dur = m.dur || 0, pos = m.pos || 0;
+  return m.id === currentId ? 'Abierto' : pos >= dur - 3 && pos > 0 ? 'Terminado' : pos > 3 ? `Ibas en ${fmt(pos)}` : 'Sin empezar';
+};
+// One text as a button: what it is, how far you got, how long. In the library and on an audio's screen.
+function textButton(m, title, cls) {
+  const b = el('button', cls);
+  const mt = el('span', 'mt');
+  mt.append(el('em', '', progress(m)), ` · ${plural(m.count, 'línea', 'líneas')} · ${ago(m.updatedAt || Date.now())}`);
+  const bar = el('span', 'bar'), fill = el('i');
+  fill.style.width = (m.dur ? Math.min(100, (m.pos || 0) / m.dur * 100) : 0) + '%';
+  bar.append(fill);
+  b.append(el('span', 'nm', title), mt, bar);
+  b.onclick = () => openFromLib(m);
+  return b;
+}
+function textItem(m, title) {
+  const li = el('li', 'item' + (m.id === currentId ? ' on' : ''));
+  const dl = el('button', 'del');
+  dl.innerHTML = DOWN; dl.title = 'Descargar .srt'; dl.setAttribute('aria-label', `Descargar ${title} como .srt`);
+  dl.onclick = () => downloadSrt(m);
+  li.append(textButton(m, title, 'open'), dl, delBtn(`Borrar ${title}`, 'Borrar', async () => {
+    await Store.remove(m);
+    if (m.id === currentId) closeScript();   // its audio stays loaded: the screen lists its other texts
+    if (TX.prev && TX.prev.meta.id === m.id) TX.prev = null;   // nothing to bring back after a cancel
+    toast(`«${title}» se borró de tu biblioteca.`);
+  }));
+  return li;
+}
 function renderLib() {
-  const n = library.length;
+  // Audios, most recently used first, each with its texts; then the texts whose audio is not saved here.
+  const groups = new Map(audios.map(a => [a.key, { a, texts: [], t: a.usedAt || a.addedAt || 0 }]));
+  const loose = [];
+  for (const m of library) {
+    const g = m.audioKey && groups.get(m.audioKey);
+    if (g) { g.texts.push(m); g.t = Math.max(g.t, m.updatedAt || 0); } else loose.push(m);
+  }
+  const list = [...groups.values()].sort((x, y) => y.t - x.t);
+  const n = list.length + loose.length;
   $('libCount').textContent = n; $('libCount').hidden = !n;
   $('libSub').textContent = !Store.ready ? 'Cargando tu biblioteca…'
-    : Store.kind === 'local' ? 'Guiones y audio guardados en este navegador: no salen de tu equipo y solo tú los ves.'
-    : 'Este navegador no permite guardar guiones.';
+    : Store.kind === 'local' ? 'Tus audios y sus textos, guardados en este navegador: no salen de tu equipo y solo tú los ves.'
+    : 'Este navegador no permite guardar nada.';
   $('libEmpty').hidden = !!n || !Store.ready;
   const ul = $('libList');
   ul.textContent = '';
-  library.forEach(m => {
-    const li = document.createElement('li');
-    li.className = 'item' + (m.id === currentId ? ' on' : '');
-    const open = document.createElement('button');
-    open.className = 'open';
-    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = m.name;
-    const mt = document.createElement('span'); mt.className = 'mt';
-    const dur = m.dur || 0, pos = m.pos || 0;
-    const state = document.createElement('em');
-    state.textContent = m.id === currentId ? 'Abierto' : pos >= dur - 3 && pos > 0 ? 'Terminado' : pos > 3 ? `Ibas en ${fmt(pos)}` : 'Sin empezar';
-    mt.append(state, ` · ${m.count} líneas · ${fmt(dur)} · ${audioIds.has(m.id) ? 'con audio' : 'sin audio'} · ${ago(m.updatedAt || Date.now())}`);
-    const bar = document.createElement('span'); bar.className = 'bar';
-    const fill = document.createElement('i'); fill.style.width = (dur ? Math.min(100, pos / dur * 100) : 0) + '%';
-    bar.append(fill);
-    open.append(nm, mt, bar);
-    open.onclick = () => openFromLib(m);
-    const del = document.createElement('button');
-    del.className = 'del'; del.innerHTML = TRASH; del.setAttribute('aria-label', `Borrar ${m.name}`); del.title = 'Borrar';
-    del.onclick = async () => {
-      if (!del.classList.contains('armed')) {
-        del.classList.add('armed'); del.textContent = 'Borrar';
-        del.setAttribute('aria-label', `Confirmar: borrar ${m.name}`);
-        setTimeout(() => { if (del.isConnected) { del.classList.remove('armed'); del.innerHTML = TRASH; del.setAttribute('aria-label', `Borrar ${m.name}`); } }, 3500);
-        return;
-      }
-      try {
-        await Store.remove(m);
-        AudioStore.del(m.id).catch(() => {}); audioIds.delete(m.id);
-        if (m.id === currentId) closeScript();   // its audio, if loaded, stays as an audio on its own
-        if (TX.prev && TX.prev.meta.id === m.id) { TX.prev = null; audioOwner = null; }   // nothing to bring back after a cancel
-        toast(`«${m.name}» se borró de tu biblioteca.`);
-      } catch (e) { toast('No pude borrarlo. Prueba de nuevo en unos segundos.'); }
-    };
-    li.append(open, del);
+  for (const { a, texts } of list) {
+    const li = el('li', 'grp' + (a.key === loadedKey() ? ' on' : ''));
+    const hd = el('div', 'ghd');
+    const open = el('button', 'gopen');
+    open.title = 'Cargar este audio y ver sus textos';
+    const ic = el('span', 'gic'); ic.innerHTML = NOTE;
+    const info = el('span', 'ginfo');
+    const what = texts.length ? plural(texts.length, 'texto', 'textos') : 'sin texto todavía';
+    info.append(el('span', 'nm', a.name), el('span', 'mt', (a.dur ? fmt(a.dur) + ' · ' : '') + what));
+    open.append(ic, info);
+    open.onclick = () => openAudio(a.key);
+    const all = texts.length ? ` y ${texts.length === 1 ? 'su texto' : `sus ${texts.length} textos`}` : '';
+    hd.append(open, delBtn(`Borrar ${a.name}${all}`, texts.length ? 'Borrar todo' : 'Borrar', () => removeAudio(a, all)));
+    li.append(hd);
+    if (texts.length) {
+      const sub = el('ul', 'gl');
+      texts.forEach(m => sub.append(textItem(m, textLabel(m))));
+      li.append(sub);
+    }
     ul.append(li);
-  });
+  }
+  if (loose.length) {
+    const li = el('li', 'grp');
+    li.append(el('div', 'gtitle', list.length ? 'Textos sin audio guardado' : 'Textos'));
+    const sub = el('ul', 'gl loose');
+    loose.forEach(m => { const l = textLabel(m); sub.append(textItem(m, l.startsWith('Whisper') ? `${m.name} · ${l}` : m.name)); });
+    li.append(sub); ul.append(li);
+  }
+  updateEmpty();
 }
-// Open a saved script with its own audio. An audio loaded on its own is reused when its name matches
-// (or the script never had one); an audio that belongs to another script is set aside, never mixed in.
+// Delete an audio and every text made for it.
+async function removeAudio(a, all) {
+  const key = a.key;
+  if (TX.running && loadedKey() === key) txCancel('Transcripción cancelada: borraste su audio.');
+  if (currentId && currentMeta.audioKey === key) closeScript();
+  if (TX.prev && TX.prev.meta.audioKey === key) TX.prev = null;
+  Store.removeAudio(key);
+  storedAudio.delete(key);
+  await AudioStore.del(key).catch(() => {});
+  if (loadedKey() === key) { unloadAudio(); spareAudio = null; cues = []; render(); updateNotice(); Store.setLast(null); }
+  renderLib();
+  toast(`«${a.name}»${all} ${all ? 'se borraron' : 'se borró'} de tu biblioteca.`);
+}
+async function downloadSrt(m) {
+  let list = null;
+  try { list = m.id === currentId && !TX.live ? cues : await Store.load(m); } catch (e) {}
+  if (!list || !list.length) { toast('No pude leer este texto.'); return; }
+  const l = textLabel(m);
+  const name = (l.startsWith('Whisper') ? `${m.name} (${l})` : m.name).replace(/[\\/:*?"<>|]+/g, '-') + '.srt';
+  const url = URL.createObjectURL(new Blob([toSrt(list)], { type: 'application/x-subrip' }));
+  const a = el('a'); a.href = url; a.download = name;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+// Open a saved text with its own audio. Another text of the audio playing keeps it playing; an audio
+// loaded on its own is reused when the text never had one saved (and the names match); an audio that
+// goes with something else is set aside, never mixed in.
 async function openFromLib(m) {
   if (m.id === currentId) { closeLib(); return; }
   let list;
   try { list = await Store.load(m); if (!list.length) throw 0; }
-  catch (e) { toast('No pude abrir este guion. Prueba de nuevo en unos segundos.'); return; }
-  if (TX.running) txCancel('Transcripción cancelada: abriste otro guion.');
+  catch (e) { toast('No pude abrir este texto. Prueba de nuevo en unos segundos.'); return; }
+  if (TX.running) txCancel('Transcripción cancelada: abriste otro texto.');
   persistPos(0);
-  const stored = audioIds.has(m.id);
-  const reuse = !stored && mode === 'audio' && audioOwner === null && (!m.audioName || m.audioName === audio._file.name);
-  if (!stored && !reuse) unloadAudio();
-  openScript(m, list);
+  const key = m.audioKey, same = !!key && loadedKey() === key;
+  const stored = !same && !!key && storedAudio.has(key);
+  const reuse = !same && !stored && mode === 'audio' && !currentId && (!m.audioName || m.audioName === audio._file.name);
+  // Switching between texts of the audio you are listening to keeps your place in it.
+  const keep = same && (!!currentId || now() > 1);
+  if (!same && !stored && !reuse) unloadAudio();
+  openScript(m, list, keep);
   if (reuse) pairAudio(audio._file, true);
-  else if (stored && !(await restoreAudio(m.id)) && mode === 'audio' && audioOwner !== m.id) unloadAudio();
+  else if (stored && !(await restoreAudio(currentMeta)) && currentId === m.id && mode === 'audio' && !ownsAudio()) unloadAudio();
+  if (key && Store.audio(key)) Store.putAudio({ key, usedAt: Date.now() });
   closeLib();
 }
 function openLib() {
@@ -838,7 +1010,7 @@ $('libBtn').onclick = openLib;
 $('emptyLib').onclick = openLib;
 $('libClose').onclick = closeLib;
 $('scrim').onclick = () => { closeLib(); closeTx(); };
-$('lib').addEventListener('click', e => { if (e.target.closest('label[for="inSrt"]')) closeLib(); });
+$('lib').addEventListener('click', e => { if (e.target.closest('label[for="inSrt"], label[for="inAudio"]')) closeLib(); });
 
 /* ---------- layout: measure header, notice and transport so the prompter fills the rest ---------- */
 function measureChrome() {
@@ -1023,6 +1195,8 @@ async function openTx() {
   $('txAudio').textContent = '';
   const nm = document.createElement('strong'); nm.textContent = audio._file.name;
   $('txAudio').append('Audio: ', nm, isFinite(audio.duration) ? ` (${fmt(audio.duration)})` : '');
+  const done = [...new Set(textsFor(loadedKey()).map(textLabel).filter(l => l.startsWith('Whisper ')).map(l => l.slice(8)))];
+  if (done.length) $('txAudio').append(`. Ya lo transcribiste con ${done.join('; ')}: el nuevo texto quedará junto a ${done.length === 1 ? 'ese' : 'esos'}.`);
   await renderModels(S.txModel);
   $('txLang').value = S.txLang != null ? S.txLang : 'spanish';
   $('tx').hidden = false; $('scrim').hidden = false;
@@ -1114,7 +1288,7 @@ function leaveLive() {
   if (!TX.live) return;
   TX.live = false; setPending(null);
   const prev = TX.prev; TX.prev = null;
-  if (prev) { openScript(prev.meta, prev.cues, true); audioOwner = prev.owner; }
+  if (prev) openScript(prev.meta, prev.cues, true);
   else { cues = []; userSrt = false; render(); resetSrtSlot(); }
 }
 
@@ -1183,9 +1357,9 @@ async function startTx() {
     const windows = splitWindows(pcm), total = pcm.length / 16000;
     // Show the lines as they come; the audio can keep playing meanwhile. Whatever was on screen is
     // kept aside and comes back if this is cancelled or fails.
-    TX.prev = currentId ? { meta: { ...currentMeta }, cues, owner: audioOwner } : null;
+    TX.prev = currentId ? { meta: { ...currentMeta }, cues } : null;
     persistPos(0);
-    cues = []; userSrt = true; currentId = null; currentMeta = null; resumeFrom = 0; suggestion = null;
+    cues = []; userSrt = true; currentId = null; currentMeta = null; resumeFrom = 0;
     TX.live = true; TX.upto = 0;
     setPending('Transcribiendo… el texto aparecerá aquí en unos segundos.');
     render(); setFollow(true);
@@ -1229,7 +1403,7 @@ async function startTx() {
   }
 }
 // The lines are already on screen and the audio may be playing: keep both exactly as they are and just
-// turn the transcript into a saved script that owns this audio.
+// turn the transcript into a saved text of this audio, next to any other texts it already had.
 async function finishTx(file, label) {
   if (!cues.length) {
     leaveLive();
@@ -1240,21 +1414,22 @@ async function finishTx(file, label) {
   TX.live = false; TX.prev = null; setPending(null);
   const list = cues.slice();
   const name = file.name.replace(/\.[^.]+$/, '');
-  const srt = list.map((c, i) => `${i + 1}\n${fmtTC(c.start)} --> ${fmtTC(c.end)}\n${c.text}\n`).join('\n');
   const t = Date.now(), pos = Math.round(now() * 10) / 10;
   const meta = {
-    id: 's' + hash(srt), name, file: `${name}.srt (Whisper ${label})`, count: list.length,
-    dur: list[list.length - 1].end, pos, audioName: file.name, createdAt: t, updatedAt: t
+    id: 's' + hash(toSrt(list)), name, file: `${name}.srt (Whisper ${label})`, via: `Whisper ${label}`, count: list.length,
+    dur: list[list.length - 1].end, pos, audioName: file.name, audioKey: keyOf(file), createdAt: t, updatedAt: t
   };
   currentId = meta.id; currentMeta = { ...meta }; userSrt = true; resumeFrom = 0; lastSavedPos = pos;
-  audioOwner = meta.id;
   $('srtName').textContent = meta.file; $('slotSrt').classList.add('ok');
-  Store.setLast(meta.id);
   updateTxBtn(); updateNotice(); updateEmpty(); renderSegs(); dirty = true;
-  saveAudio(meta.id, file, true);
+  rememberAudio(file);
   if (Store.kind !== 'none') {
-    try { await Store.save(meta, list); renderLib(); toast(`Transcripción lista: ${list.length} líneas, guardada en tu biblioteca.`); }
-    catch (e) { toast(`Transcripción lista: ${list.length} líneas. No pude guardarla en la biblioteca.`); }
+    try {
+      await Store.save(meta, list);
+      Store.setLast(meta.id);
+      const others = textsFor(meta.audioKey).length - 1;
+      toast(`Transcripción lista: ${list.length} líneas, guardada en tu biblioteca` + (others > 0 ? ` junto a ${others === 1 ? 'otro texto' : `otros ${others} textos`} de este audio.` : '.'));
+    } catch (e) { toast(`Transcripción lista: ${list.length} líneas. No pude guardarla en la biblioteca.`); }
   } else toast(`Transcripción lista: ${list.length} líneas.`);
 }
 $('txBtn').onclick = openTx;
@@ -1277,13 +1452,16 @@ const untouched = () => !userSrt && mode !== 'audio';
 Store.initP = withTimeout(Store.init(), 12000).catch(() => { if (Store.kind === 'none') Store.useLocal(); });
 Store.initP.then(async () => {
   Store.ready = true; renderLib();
+  try { await withTimeout(migrateAudio(), 20000); } catch (e) {}
   try {
+    // The last thing on screen: a text (with its audio) or an audio on its own (with its list of texts).
     const last = await withTimeout(Store.getLast(), 6000);
     if (!last || !untouched()) return;
+    if (last[0] === 'a') { if (storedAudio.has(last)) openAudio(last); return; }
     const meta = await withTimeout(Store.getMeta(last), 6000);
     if (!meta || !untouched()) return;
     const list = await withTimeout(Store.load(meta), 15000);
-    if (list.length && untouched()) { openScript(meta, list); restoreAudio(meta.id); }
+    if (list.length && untouched()) { openScript(meta, list); restoreAudio(meta); }
   } catch (e) {}
 });
 })();

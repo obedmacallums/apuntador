@@ -20,7 +20,7 @@
     <div class="hd gutter">
       <div class="brand">Apuntador <span class="tally" id="tally"><i></i>Al aire</span></div>
       <div class="files">
-        <button class="libbtn" id="libBtn" aria-label="Biblioteca" aria-expanded="false" aria-controls="lib" title="Tus guiones guardados (B)">
+        <button class="libbtn" id="libBtn" aria-label="Biblioteca" aria-expanded="false" aria-controls="lib" title="Tus audios y textos guardados (B)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h4v16H4zM10 4h4v16h-4zM16.5 4.5l3.6 1-4 15-3.6-1z"/></svg>
           <span class="hide-sm">Biblioteca</span><span class="badge" id="libCount" hidden></span>
         </button>
@@ -49,7 +49,8 @@
     <div class="reading" aria-hidden="true"></div>
     <div class="empty" id="empty" hidden><div>
       <h2 id="emptyTitle">Falta el texto</h2>
-      <p id="emptyText">El audio ya está listo. Ahora elige el archivo .srt con la transcripción, o abre un guion de tu biblioteca.</p>
+      <p id="emptyText">El audio ya está listo. Ahora elige el archivo .srt con la transcripción, o abre algo de tu biblioteca.</p>
+      <div class="choices" id="emptyList" hidden></div>
       <div class="nacts"><button class="nbtn primary" id="emptyTx" type="button" hidden>Transcribir con Whisper</button><label class="nbtn" for="inSrt">Elegir SRT</label><button class="nbtn" id="emptyLib" type="button">Abrir biblioteca</button></div>
     </div></div>
     <button class="follow" id="follow" hidden>
@@ -129,7 +130,7 @@
 <div class="scrim" id="scrim" hidden></div>
 <aside class="lib" id="lib" hidden role="dialog" aria-labelledby="libTitle">
   <div class="lib-hd">
-    <h2 id="libTitle">Tus guiones</h2>
+    <h2 id="libTitle">Tu biblioteca</h2>
     <button class="ib" id="libClose" aria-label="Cerrar biblioteca">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
@@ -138,9 +139,9 @@
   <div class="lib-body">
     <ul class="lib-list" id="libList"></ul>
     <div class="lib-empty" id="libEmpty" hidden>
-      <strong>Aún no hay guiones</strong>
-      <span>Cada SRT que cargas se guarda aquí con su nombre y el punto donde te quedaste. El audio no se guarda: lo eliges al abrir el guion.</span>
-      <label class="nbtn primary" for="inSrt">Elegir SRT</label>
+      <strong>Aún no hay nada guardado</strong>
+      <span>Cada audio que cargas se guarda aquí con sus textos: los SRT que eliges y los que escribe Whisper, cada uno con el punto donde te quedaste.</span>
+      <div class="nacts"><label class="nbtn primary" for="inAudio">Elegir audio</label><label class="nbtn" for="inSrt">Elegir SRT</label></div>
     </div>
   </div>
 </aside>
