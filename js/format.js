@@ -37,3 +37,18 @@ export function hash(s) {
 }
 
 export const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), ms))]);
+
+// A long file name on one line is cut in the middle, so its end stays in sight:
+// "How_God_Inspires_Imperfect_Human_Writers.m4a" → ["How_God_Inspires_Imperfect_Human_", "Writers.m4a"].
+// The tail (never cut) is the last word after _ - or a space, with the extension; a very short last word
+// ("v2", "12") brings the one before it; a word too long for that gives the last 8 characters instead.
+export function splitTail(name) {
+  name = String(name ?? '');
+  const ext = (name.match(/\.[a-z0-9]{1,5}$/i) || [''])[0];
+  const base = name.slice(0, name.length - ext.length);
+  const parts = base.match(/[^_\-\s]+[_\-\s]*|[_\-\s]+/g) || [];
+  let tail = parts.pop() || '';
+  if (tail.length < 4 && parts.length) tail = parts.pop() + tail;
+  if (tail.length > 16) tail = base.slice(-8);
+  return [base.slice(0, base.length - tail.length), tail + ext];
+}

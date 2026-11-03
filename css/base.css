@@ -1,61 +1,106 @@
-/* Base: colors (light and dark), reset, and pieces used all over: buttons, text helpers, toast, drop zone. */
-:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;padding:0;font-size:14px;font-family:var(--f-read);background:var(--bg);color:var(--ink);overflow-x:hidden}
+/* Base: themes and accents, reset, and pieces used all over: buttons, names, sheets, toast, drop zone. */
+
+/* Themes. The <html> element carries one theme (th-…), one accent (ac-…), "dark" for the night themes
+   and the current-word style (w-fondo or w-sub). settings.js picks them; index.html sets them before the first paint. */
+.th-claro{--bg:#F2F2F5;--surface:#FFFFFF;--raise:#E9E9EE;--line:rgba(17,17,20,.10);--ink:#111114;--soft:#5C5C66;--dim:#85858F;--glass:rgba(255,255,255,.80);--scrim:rgba(17,17,20,.32);--shadow:0 24px 64px rgba(17,17,20,.16),0 2px 8px rgba(17,17,20,.06);--live:#D93025}
+.th-papel{--bg:#F4EEE3;--surface:#FBF8F2;--raise:#EBE3D4;--line:rgba(60,40,10,.13);--ink:#2A2118;--soft:#665645;--dim:#8E7D66;--glass:rgba(251,248,242,.82);--scrim:rgba(42,33,24,.32);--shadow:0 24px 64px rgba(60,40,10,.16),0 2px 8px rgba(60,40,10,.06);--live:#C8361F}
+.th-oscuro{--bg:#111114;--surface:#1D1D21;--raise:#2B2B31;--line:rgba(255,255,255,.09);--ink:#F4F4F6;--soft:#A3A3AD;--dim:#686872;--glass:rgba(29,29,33,.78);--scrim:rgba(0,0,0,.55);--shadow:0 24px 70px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.4);--live:#FF5A4E}
+.th-medianoche{--bg:#000000;--surface:#141416;--raise:#242428;--line:rgba(255,255,255,.10);--ink:#FFFFFF;--soft:#A0A0A8;--dim:#606068;--glass:rgba(20,20,22,.80);--scrim:rgba(0,0,0,.6);--shadow:0 24px 70px rgba(0,0,0,.8);--live:#FF5A4E}
+.ac-azul,.ac-indigo,.ac-turquesa,.ac-naranja,.ac-rosa,.ac-mono{--on-accent:#FFFFFF;--wash:color-mix(in srgb,var(--accent) 13%,transparent)}
+.dark.ac-azul,.dark.ac-indigo,.dark.ac-turquesa,.dark.ac-naranja,.dark.ac-rosa,.dark.ac-mono{--on-accent:#0B0B0F;--wash:color-mix(in srgb,var(--accent) 20%,transparent)}
+.ac-azul{--accent:#0A64D8}.dark.ac-azul{--accent:#4A9DFF}
+.ac-indigo{--accent:#4F46D8}.dark.ac-indigo{--accent:#8B85FF}
+.ac-turquesa{--accent:#0B7480}.dark.ac-turquesa{--accent:#4FD0D8}
+.ac-naranja{--accent:#B9520A}.dark.ac-naranja{--accent:#FF9F4A}
+.ac-rosa{--accent:#C0245F}.dark.ac-rosa{--accent:#FF6E9C}
+.ac-mono{--accent:#2E2E35}.dark.ac-mono{--accent:#E4E4E8}
+
+:root{color-scheme:light;--fs:40px;--hd:72px;
+  --f-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,"Segoe UI",Roboto,system-ui,sans-serif;
+  --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px)}
+:root.dark{color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;font-family:var(--f-ui);font-size:14px;line-height:1.4;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
 img{max-width:100%}
 [hidden]{display:none!important}
-button{font:inherit;color:inherit}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.vh{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
 
-/* Colors and fonts */
-:root{
-  --bg:#eef0f3; --surface:#ffffff; --raise:#f7f8fa; --line:#d5dae1;
-  --ink:#10151b; --ink-soft:#4b5562; --ink-dim:#9aa3ae;
-  --cue:#0a6c76; --cue-wash:rgba(10,108,118,.10); --seg:rgba(10,108,118,.28);
-  --tally:#d43a2a; --shadow:0 10px 30px rgba(16,21,27,.14);
-  --f-read:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
-  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --fs:40px;
-}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0c0f13; --surface:#151a20; --raise:#1b2129; --line:#29313b;
-  --ink:#f2f5f8; --ink-soft:#a9b2bd; --ink-dim:#4d5661;
-  --cue:#5fd2da; --cue-wash:rgba(95,210,218,.12); --seg:rgba(95,210,218,.30);
-  --tally:#ff5b4b; --shadow:0 10px 30px rgba(0,0,0,.5); color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#0c0f13; --surface:#151a20; --raise:#1b2129; --line:#29313b;
-  --ink:#f2f5f8; --ink-soft:#a9b2bd; --ink-dim:#4d5661;
-  --cue:#5fd2da; --cue-wash:rgba(95,210,218,.12); --seg:rgba(95,210,218,.30);
-  --tally:#ff5b4b; --shadow:0 10px 30px rgba(0,0,0,.5); color-scheme:dark}
-
-.gutter{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-
-/* Buttons */
-.ib{display:inline-grid;place-items:center;min-width:44px;height:44px;padding:0 8px;border:0;border-radius:10px;background:transparent;cursor:pointer;color:var(--ink)}
+/* Buttons. .btn: a rounded action; .primary is the accent one. .round: a circle with an icon. .pill: icon
+   and label (the header). .ib: a bare icon. .txtbtn: text only, like iOS "Listo". */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:0;max-width:100%;height:36px;padding:0 16px;border:0;border-radius:18px;background:var(--raise);color:var(--ink);font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;text-decoration:none;transition:filter .15s,opacity .15s}
+.btn:hover{filter:brightness(.97)}
+.dark .btn:hover{filter:brightness(1.12)}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.lg{height:48px;padding:0 22px;border-radius:24px;font-size:15px}
+.btn.soft{background:var(--wash);color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.btn .mn{flex:0 1 auto}
+.round{flex:none;width:44px;height:44px;border-radius:22px;border:0;padding:0;background:var(--raise);color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.round svg{width:20px;height:20px}
+.round:hover{filter:brightness(.96)}
+.dark .round:hover{filter:brightness(1.15)}
+.ib{flex:none;display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:22px;padding:0;background:transparent;color:var(--ink);cursor:pointer}
+.ib svg{width:20px;height:20px}
 .ib:hover{background:var(--raise)}
-.ib svg{width:22px;height:22px}
-.ib .lbl{font-family:var(--f-mono);font-size:13px;font-weight:500}
-:focus-visible{outline:2px solid var(--cue);outline-offset:2px}
-.nbtn{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:5px 11px;font-size:13px;cursor:pointer;color:var(--ink);white-space:nowrap}
-.nbtn:hover{border-color:var(--cue)}
-.nbtn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.nbtn.lg{padding:9px 16px;font-size:14px}
+.ib.dim{color:var(--soft)}
+.ib[aria-pressed="true"]{color:var(--accent);background:var(--wash)}
+.txtbtn{height:44px;padding:0 12px;border:0;background:transparent;color:var(--accent);font-size:16px;font-weight:600;cursor:pointer}
+.link{height:32px;border:0;background:transparent;padding:0 4px;color:var(--soft);font-size:13px;cursor:pointer}
+.link:hover{color:var(--ink)}
+.link.accent{color:var(--accent);font-weight:600}
 
-/* Text helpers: name, details line, progress bar (library items and an audio's texts) */
-.nm{font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mt{font-family:var(--f-mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;line-height:1.5}
-.mt em{font-style:normal;color:var(--cue)}
-.bar{height:3px;border-radius:2px;background:var(--line);overflow:hidden}
-.bar i{display:block;height:100%;background:var(--cue)}
+/* A file name on one line: cut in the middle so its end (and extension) stays in sight. ui.js midName(). */
+.mn{display:flex;min-width:0;max-width:100%}
+.mn>span{white-space:pre}
+.mn-h{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.mn-t{flex:none}
+/* A name where there is room: up to two lines, breaking even names with no spaces. */
+.clamp2{overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
-/* Overlays */
-.scrim{position:fixed;inset:0;z-index:15;background:color-mix(in srgb,#000 35%,transparent)}
-.drop{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:color-mix(in srgb,var(--bg) 88%,transparent);padding:24px}
-.drop div{border:2px dashed var(--cue);border-radius:20px;padding:40px 28px;text-align:center;max-width:420px;font-size:18px;font-weight:700}
-.drop small{display:block;margin-top:8px;font-weight:400;font-size:14px;color:var(--ink-soft)}
-.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);transform:translateX(-50%);z-index:30;max-width:calc(100vw - 32px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;box-shadow:var(--shadow)}
+/* An icon in a rounded square (library rows, the transcription window), and the count badge. */
+.tile{flex:none;width:44px;height:44px;border-radius:12px;background:var(--wash);color:var(--accent);display:grid;place-items:center}
+.tile svg{width:20px;height:20px}
+.tile.mute{background:var(--raise);color:var(--soft)}
+.tile.big{width:60px;height:60px;border-radius:18px}
+.tile.big svg{width:28px;height:28px}
+.badge{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--ink);color:var(--bg);font-size:11px;font-weight:700;display:inline-grid;place-items:center;font-variant-numeric:tabular-nums}
 
-@media (max-width:620px){
-  .hide-sm{display:none!important}   /* wins over any later display rule (.keys, .ib…) */
-  .ib{min-width:40px;padding:0 6px}
+/* Overlays. The scrim shows under the library and the transcription window, and on phones under every sheet. */
+.scrim{position:fixed;inset:0;z-index:15;background:var(--scrim);display:none}
+body:has(#lib:not([hidden])) .scrim,body:has(#tx:not([hidden])) .scrim{display:block}
+.drop{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:20px;background:color-mix(in srgb,var(--bg) 88%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.drop-box{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;border:2px dashed var(--accent);border-radius:22px;background:var(--wash);text-align:center;padding:24px}
+.drop-ic{width:56px;height:56px;border-radius:28px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center}
+.drop-ic svg{width:26px;height:26px}
+.drop strong{font-size:18px}
+.drop small{font-size:14px;color:var(--soft)}
+.toast{position:fixed;left:50%;top:calc(var(--sat) + 14px);transform:translateX(-50%);z-index:50;width:max-content;max-width:min(440px,calc(100vw - 32px));display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-radius:18px;background:var(--ink);color:var(--bg);font-size:14px;line-height:1.4;box-shadow:var(--shadow);overflow-wrap:anywhere}
+
+/* Sheets: the library, the transcription window, Ajustes and the audio menu share their frame.
+   On phones they rise from the bottom with a grabber, and their footer stays above the browser bar. */
+.sheet{display:flex;flex-direction:column;background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden}
+.grab{display:none}
+.sheet-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 16px 8px 24px}
+.sheet-hd h2{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.sheet-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.sheet-ft{flex:none;display:flex;align-items:center;gap:10px;padding:14px 20px 18px;border-top:1px solid var(--line);background:var(--surface)}
+
+@media (min-width:620px){.only-sm{display:none!important}}
+@media (max-width:619px){
+  .hide-sm{display:none!important}
+  body:has(#panel:not([hidden])) .scrim,body:has(#menu:not([hidden])) .scrim{display:block}
+  .sheet{position:fixed;z-index:16;left:0;right:0;bottom:0;top:auto;width:auto;max-height:calc(100dvh - var(--sat) - 40px);border:0;border-radius:28px 28px 0 0;transform:none}
+  .grab{display:block;flex:none;align-self:center;width:36px;height:5px;margin-top:8px;border-radius:3px;background:var(--raise)}
+  .sheet-hd{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);padding:2px 8px 6px}
+  .sheet-hd h2{grid-column:2;font-size:17px;font-weight:600;letter-spacing:0;text-align:center}
+  .sheet-hd>.txtbtn:first-child{grid-column:1;justify-self:start}
+  .sheet-hd>.txtbtn:last-child:not(:first-child),.sheet-hd>.round:last-child{grid-column:3;justify-self:end}
+  .sheet-ft{flex-direction:column;align-items:stretch;gap:8px;padding:12px 16px calc(var(--sab) + 16px);background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px)}
+  .sheet-ft .btn.lg{height:54px;border-radius:27px;font-size:17px}
 }
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}

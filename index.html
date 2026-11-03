@@ -1,16 +1,23 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" class="th-papel ac-azul w-fondo">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Apuntador de Audio</title>
 <meta name="description" content="Teleprompter que sigue tu audio línea a línea con su archivo SRT y que puede transcribirlo con Whisper dentro del navegador.">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#151a20" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" id="themeColor" content="#F4EEE3">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>
+// The theme before the first paint, so the page never flashes the wrong colors. settings.js keeps it up to date.
+(function () {
+  var s = {}; try { s = JSON.parse(localStorage.getItem('apuntador') || '{}'); } catch (e) {}
+  var d = s.mode === 'oscuro' || (s.mode !== 'claro' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.className = 'th-' + (d ? s.dark || 'oscuro' : s.light || 'papel') + ' ac-' + (s.accent || 'azul') + (d ? ' dark' : '') + ' w-fondo';
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/shell.css">
 <link rel="stylesheet" href="css/prompter.css">
@@ -21,166 +28,237 @@
 <body>
 
 <div class="app" id="app">
-  <header>
-    <div class="hd gutter">
-      <div class="brand">Apuntador <span class="tally" id="tally"><i></i>Al aire</span></div>
-      <div class="files">
-        <button class="libbtn" id="libBtn" aria-label="Biblioteca" aria-expanded="false" aria-controls="lib" title="Tus audios y textos guardados (B)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h4v16H4zM10 4h4v16h-4zM16.5 4.5l3.6 1-4 15-3.6-1z"/></svg>
-          <span class="hide-sm">Biblioteca</span><span class="badge" id="libCount" hidden></span>
-        </button>
-        <button class="libbtn" id="txBtn" hidden aria-label="Transcribir el audio" title="Transcribir el audio con Whisper">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4M7 7v10M11 4v16M15 8v8"/><path d="M19 9h2M18 13h3M19 17h2"/></svg>
-          <span class="hide-sm">Transcribir</span>
-        </button>
-        <label class="slot" id="slotAudio" title="Elegir archivo de audio">
-          <b>Audio</b><span id="audioName">Elegir MP3</span>
-          <input type="file" id="inAudio" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac,.flac,.opus">
-        </label>
-        <label class="slot" id="slotSrt" title="Elegir archivo de subtítulos">
-          <b>Texto</b><span id="srtName">Elegir SRT</span>
-          <input type="file" id="inSrt" accept=".srt,.vtt,text/plain,application/x-subrip">
-        </label>
-      </div>
+  <header class="hd" id="hd">
+    <span class="brand">Apuntador</span>
+    <button class="chip" id="chip" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="menu">
+      <span class="chip-ic" id="chipIc"></span>
+      <span class="chip-tx"><span class="chip-nm" id="chipName"></span><span class="chip-sub" id="chipSub"></span></span>
+      <svg class="chip-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="hd-acts">
+      <button class="pill" id="libBtn" type="button" aria-expanded="false" aria-controls="lib" title="Tus audios y textos guardados (B)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h4v16H4zM10 4h4v16h-4zM16.5 4.5l3.6 1-4 15-3.6-1z"/></svg>
+        <span class="lbl">Biblioteca</span><span class="badge" id="libCount" hidden></span>
+      </button>
+      <button class="pill" id="txBtn" type="button" hidden aria-label="Transcribir el audio" title="Transcribir el audio con Whisper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10v4M7 7v10M11 4v16M15 8v8M19 10v4"/></svg>
+        <span class="lbl">Transcribir</span>
+      </button>
+      <button class="round hide-sm" id="setBtn" type="button" aria-label="Ajustes" aria-expanded="false" aria-controls="panel" title="Ajustes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      </button>
     </div>
   </header>
 
-  <div class="notice gutter" id="notice"><span id="noticeText"><strong>Este texto es solo un ejemplo.</strong> Para ver el de tu audio necesitas su archivo .srt: elige el audio y el SRT arriba, o arrástralos a la ventana.</span><div class="nacts" id="noticeActs"></div></div>
+  <div class="notice-wrap" id="notice">
+    <div class="notice" role="status">
+      <span class="n-ic" id="noticeIc" aria-hidden="true"></span>
+      <div class="n-body" id="noticeText"></div>
+      <div class="nacts" id="noticeActs"></div>
+      <span class="n-bar" id="noticeBar" hidden><i></i></span>
+    </div>
+  </div>
 
   <main id="main">
-    <div class="scroller gutter" id="scroller" tabindex="-1">
+    <div class="scroller" id="scroller" tabindex="-1">
       <div class="cues karaoke" id="cues" aria-live="off"></div>
     </div>
-    <div class="reading" aria-hidden="true"></div>
-    <div class="empty" id="empty" hidden><div>
-      <h2 id="emptyTitle">Falta el texto</h2>
-      <p id="emptyText">El audio ya está listo. Ahora elige el archivo .srt con la transcripción, o abre algo de tu biblioteca.</p>
-      <div class="choices" id="emptyList" hidden></div>
-      <div class="nacts"><button class="nbtn primary" id="emptyTx" type="button" hidden>Transcribir con Whisper</button><label class="nbtn" for="inSrt">Elegir SRT</label><button class="nbtn" id="emptyLib" type="button">Abrir biblioteca</button></div>
-    </div></div>
-    <button class="follow" id="follow" hidden>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+    <div class="empty" id="empty" hidden></div>
+    <button class="follow" id="follow" type="button" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
       Volver a la línea actual
     </button>
   </main>
 
-  <footer>
-    <div class="deck gutter">
+  <footer class="ft" id="ft">
+    <div class="deck">
       <div class="seekrow">
-        <span id="tCur">0:00</span>
+        <span class="t" id="tCur">0:00</span>
         <div class="seek" id="seekWrap">
           <div class="rail"><div class="segs" id="segs"></div><div class="fill"></div></div>
-          <input type="range" id="seek" min="0" max="1" step="0.05" value="0" aria-label="Posición">
+          <input type="range" id="seek" min="0" max="1" step="0.05" value="0" aria-label="Posición en el audio">
         </div>
-        <span id="tDur">0:00</span>
+        <span class="t" id="tDur">0:00</span>
+        <span class="counter only-sm" id="counterSm">—</span>
       </div>
       <div class="ctrls">
-        <div class="left" id="counter">—</div>
+        <div class="left counter hide-sm" id="counter">—</div>
         <div class="mid">
-          <button class="ib" id="back" aria-label="Retroceder 5 segundos" title="Retroceder 5 s (←)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><text x="12" y="15.5" font-size="7.5" text-anchor="middle" fill="currentColor" stroke="none" font-family="sans-serif" font-weight="700">5</text></svg>
+          <button class="ib skip" id="back" type="button" aria-label="Retroceder 5 segundos" title="Retroceder 5 s (←)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><text x="12" y="15.5" font-size="7.5" text-anchor="middle" fill="currentColor" stroke="none" font-weight="700">5</text></svg>
           </button>
-          <button class="ib play" id="play" aria-label="Reproducir" title="Reproducir (espacio)">
-            <svg id="icPlay" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
-            <svg id="icPause" viewBox="0 0 24 24" fill="currentColor" hidden><rect x="6" y="5" width="4.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.2"/></svg>
+          <button class="play" id="play" type="button" aria-label="Reproducir" title="Reproducir (espacio)">
+            <svg id="icPlay" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
+            <svg id="icPause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><rect x="6" y="5" width="4.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.2"/></svg>
           </button>
-          <button class="ib" id="fwd" aria-label="Adelantar 5 segundos" title="Adelantar 5 s (→)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/><text x="12" y="15.5" font-size="7.5" text-anchor="middle" fill="currentColor" stroke="none" font-family="sans-serif" font-weight="700">5</text></svg>
+          <button class="ib skip" id="fwd" type="button" aria-label="Adelantar 5 segundos" title="Adelantar 5 s (→)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/><text x="12" y="15.5" font-size="7.5" text-anchor="middle" fill="currentColor" stroke="none" font-weight="700">5</text></svg>
           </button>
         </div>
         <div class="right">
-          <button class="ib" id="rateBtn" title="Cambiar velocidad"><span class="lbl" id="rateLbl">1×</span></button>
-          <button class="ib hide-sm" id="fsBtn" aria-label="Pantalla completa" title="Pantalla completa (F)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+          <button class="rate" id="rateBtn" type="button" title="Cambiar velocidad"><span id="rateLbl">1×</span></button>
+          <button class="ib dim hide-sm" id="mirBtn" type="button" aria-label="Modo espejo" aria-pressed="false" title="Modo espejo (M)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M8 7l-4 5 4 5M16 7l4 5-4 5"/></svg>
           </button>
-          <button class="ib" id="setBtn" aria-label="Ajustes" aria-expanded="false" aria-controls="panel" title="Ajustes">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+          <button class="ib dim hide-sm" id="fsBtn" type="button" aria-label="Pantalla completa" title="Pantalla completa (F)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+          </button>
+          <button class="ib only-sm" id="setBtnSm" type="button" aria-label="Ajustes" aria-expanded="false" aria-controls="panel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
           </button>
         </div>
       </div>
-    </div>
-
-    <div class="panel" id="panel" hidden role="dialog" aria-label="Ajustes">
-      <h3>Lectura</h3>
-      <div class="row"><span>Tamaño del texto</span>
-        <div class="step"><button id="fsDown" aria-label="Texto más pequeño">−</button><output id="fsOut">40 px</output><button id="fsUp" aria-label="Texto más grande">+</button></div></div>
-      <div class="row"><span>Resaltar palabra a palabra<small>Exacto en lo transcrito con tiempos por palabra; en los SRT, estimado</small></span>
-        <button class="sw" id="swKaraoke" role="switch" aria-checked="true" aria-label="Resaltar palabra a palabra"></button></div>
-      <div class="row"><span>Modo espejo<small>Para cristales de teleprompter</small></span>
-        <button class="sw" id="swMirror" role="switch" aria-checked="false" aria-label="Modo espejo"></button></div>
-      <h3>Reproducción</h3>
-      <div class="seg" id="rates" role="group" aria-label="Velocidad"></div>
-      <div class="row"><span>Sincronía del texto<small>Positivo si el texto va atrasado</small></span>
-        <div class="step"><button id="offDown" aria-label="Retrasar texto 0,1 segundos">−</button><output id="offOut">0,0 s</output><button id="offUp" aria-label="Adelantar texto 0,1 segundos">+</button></div></div>
-      <h3>Transcripción</h3>
-      <div class="row"><span>Procesar con<small id="devNote">Auto elige GPU o CPU según el modelo.</small></span></div>
-      <div class="seg" id="devSeg" role="group" aria-label="Procesar la transcripción con">
-        <button type="button" data-d="auto" title="Elige según tu equipo y el modelo">Auto</button><button type="button" data-d="gpu" title="Tarjeta gráfica (WebGPU)">GPU</button><button type="button" data-d="cpu" title="Procesador (WASM)">CPU</button>
-      </div>
-      <div class="row"><span>Tiempos por palabra<small>El resaltado sigue la voz exacta. Desactívalo si transcribir va lento.</small></span>
-        <button class="sw" id="swWords" role="switch" aria-checked="true" aria-label="Tiempos por palabra al transcribir"></button></div>
-      <h3 class="hide-sm">Teclado</h3>
-      <dl class="keys hide-sm">
-        <dt><kbd>Espacio</kbd></dt><dd>Reproducir o pausar</dd>
-        <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Saltar 5 segundos</dd>
-        <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Línea anterior o siguiente</dd>
-        <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Tamaño del texto</dd>
-        <dt><kbd>M</kbd> <kbd>F</kbd></dt><dd>Espejo y pantalla completa</dd>
-        <dt><kbd>B</kbd></dt><dd>Abrir la biblioteca</dd>
-      </dl>
     </div>
   </footer>
 </div>
 
-<div class="scrim" id="scrim" hidden></div>
-<aside class="lib" id="lib" hidden role="dialog" aria-labelledby="libTitle">
-  <div class="lib-hd">
-    <h2 id="libTitle">Tu biblioteca</h2>
-    <button class="ib" id="libClose" aria-label="Cerrar biblioteca">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-    </button>
-  </div>
-  <p class="lib-sub" id="libSub">Cargando tu biblioteca…</p>
-  <div class="lib-body">
-    <ul class="lib-list" id="libList"></ul>
-    <div class="lib-empty" id="libEmpty" hidden>
-      <strong>Aún no hay nada guardado</strong>
-      <span>Cada audio que cargas se guarda aquí con sus textos: los SRT que eliges y los que escribe Whisper, cada uno con el punto donde te quedaste.</span>
-      <div class="nacts"><label class="nbtn primary" for="inAudio">Elegir audio</label><label class="nbtn" for="inSrt">Elegir SRT</label></div>
-    </div>
-  </div>
-</aside>
+<div class="scrim" id="scrim"></div>
 
-<div class="modal" id="tx" hidden role="dialog" aria-modal="true" aria-labelledby="txTitle">
-  <div class="modal-hd">
-    <h2 id="txTitle">Transcribir con Whisper</h2>
-    <button class="ib" id="txClose" aria-label="Cerrar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+<!-- Audio and text on screen: what else this audio has, and ways to change them. A menu under the chip, or a sheet on phones. -->
+<div class="menu sheet" id="menu" hidden role="dialog" aria-label="Audio y texto abiertos"></div>
+
+<div class="panel sheet" id="panel" hidden role="dialog" aria-labelledby="setTitle">
+  <span class="grab" aria-hidden="true"></span>
+  <div class="sheet-hd">
+    <h2 id="setTitle">Ajustes</h2>
+    <button class="round hide-sm" id="setClose" type="button" aria-label="Cerrar ajustes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
+    <button class="txtbtn only-sm" id="setDone" type="button">Listo</button>
   </div>
-  <p class="fine" id="txAudio"></p>
-  <p class="fine" id="txDev"></p>
-  <fieldset class="models" id="txModels"><legend>Modelo</legend></fieldset>
-  <label class="field">Idioma del audio
-    <select id="txLang">
-      <option value="spanish">Español</option>
-      <option value="english">Inglés</option>
-      <option value="portuguese">Portugués</option>
-      <option value="french">Francés</option>
-      <option value="italian">Italiano</option>
-      <option value="german">Alemán</option>
-      <option value="">Detectar automáticamente</option>
-    </select>
-  </label>
-  <p class="fine">Todo ocurre en tu computadora: el audio no sale del navegador. Cada modelo se descarga una sola vez y queda guardado en la caché de este navegador.</p>
-  <div class="modal-acts">
-    <button class="nbtn lg" id="txBack" type="button">Cancelar</button>
-    <button class="nbtn primary lg" id="txGo" type="button">Transcribir</button>
+  <div class="panel-body">
+    <div class="pcol">
+      <h3>Lectura</h3>
+      <div class="group">
+        <div class="row"><span class="rl">Tamaño del texto</span>
+          <span class="step"><button type="button" id="fsDown" aria-label="Texto más pequeño">−</button><output id="fsOut">40 px</output><button type="button" id="fsUp" aria-label="Texto más grande">+</button></span></div>
+        <div class="row"><span class="rl">Resaltar palabra a palabra<small>Exacto en lo transcrito; estimado en los SRT</small></span>
+          <button class="sw" id="swKaraoke" type="button" role="switch" aria-checked="true" aria-label="Resaltar palabra a palabra"></button></div>
+        <div class="row"><span class="rl">Modo espejo<small>Para cristales de teleprompter</small></span>
+          <button class="sw" id="swMirror" type="button" role="switch" aria-checked="false" aria-label="Modo espejo"></button></div>
+      </div>
+      <h3>Reproducción</h3>
+      <div class="group">
+        <div class="stack"><span class="rl">Velocidad</span><div class="seg" id="rates" role="group" aria-label="Velocidad"></div></div>
+        <div class="row"><span class="rl">Sincronía del texto<small>Positivo si el texto va atrasado</small></span>
+          <span class="step"><button type="button" id="offDown" aria-label="Retrasar el texto 0,1 segundos">−</button><output id="offOut">0,0 s</output><button type="button" id="offUp" aria-label="Adelantar el texto 0,1 segundos">+</button></span></div>
+      </div>
+      <h3>Transcripción</h3>
+      <div class="group">
+        <div class="stack"><span class="rl">Procesar con<small id="devNote">Auto elige GPU o CPU según el modelo.</small></span>
+          <div class="seg" id="devSeg" role="group" aria-label="Procesar la transcripción con">
+            <button type="button" data-d="auto" title="Elige según tu equipo y el modelo">Auto</button><button type="button" data-d="gpu" title="Tarjeta gráfica (WebGPU)">GPU</button><button type="button" data-d="cpu" title="Procesador (WASM)">CPU</button>
+          </div></div>
+        <div class="row"><span class="rl">Tiempos por palabra<small>Desactívalo si transcribir va lento</small></span>
+          <button class="sw" id="swWords" type="button" role="switch" aria-checked="true" aria-label="Tiempos por palabra al transcribir"></button></div>
+      </div>
+    </div>
+    <div class="pcol pcol-look">
+      <h3>Apariencia</h3>
+      <div class="group">
+        <div class="stack"><div class="seg" id="modeSeg" role="group" aria-label="Modo">
+          <button type="button" data-m="auto">Automático</button><button type="button" data-m="claro">Claro</button><button type="button" data-m="oscuro">Oscuro</button>
+        </div></div>
+        <div class="themes">
+          <div class="stack"><span class="rl">Tema de día</span><div class="cards" id="lightCards" role="group" aria-label="Tema de día"></div></div>
+          <div class="stack"><span class="rl">Tema de noche</span><div class="cards" id="darkCards" role="group" aria-label="Tema de noche"></div></div>
+        </div>
+        <div class="stack"><span class="rl">Color de acento</span><div class="dots" id="accDots" role="group" aria-label="Color de acento"></div></div>
+      </div>
+      <p class="gnote" id="modeNote"></p>
+      <h3 class="hide-sm">Teclado</h3>
+      <dl class="keys hide-sm">
+        <dt><kbd>Espacio</kbd></dt><dd>Reproducir o pausar</dd>
+        <dt><kbd>←</kbd><kbd>→</kbd></dt><dd>Saltar 5 segundos</dd>
+        <dt><kbd>↑</kbd><kbd>↓</kbd></dt><dd>Línea anterior o siguiente</dd>
+        <dt><kbd>+</kbd><kbd>−</kbd></dt><dd>Tamaño del texto</dd>
+        <dt><kbd>M</kbd><kbd>F</kbd></dt><dd>Espejo y pantalla completa</dd>
+        <dt><kbd>B</kbd></dt><dd>Abrir la biblioteca</dd>
+      </dl>
+    </div>
   </div>
 </div>
 
-<div class="drop" id="drop" hidden><div>Suelta aquí tu audio y tu SRT<small>Puedes soltar los dos a la vez</small></div></div>
+<aside class="lib sheet" id="lib" hidden role="dialog" aria-labelledby="libTitle">
+  <span class="grab" aria-hidden="true"></span>
+  <div class="lib-hd">
+    <div class="lib-top">
+      <h2 id="libTitle">Biblioteca</h2>
+      <button class="round" id="libClose" type="button" aria-label="Cerrar biblioteca">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="lib-sub" id="libSub">Cargando tu biblioteca…</p>
+  </div>
+  <div class="lib-body">
+    <div class="lib-list" id="libList"></div>
+    <div class="lib-empty" id="libEmpty" hidden>
+      <span class="tile big" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h4v16H4zM10 4h4v16h-4zM16.5 4.5l3.6 1-4 15-3.6-1z"/></svg></span>
+      <strong>Aún no hay nada guardado</strong>
+      <span>Cada audio que cargas se guarda aquí con sus textos: los SRT que eliges y los que escribe Whisper, cada uno con el punto donde te quedaste.</span>
+      <div class="acts"><label class="btn primary" for="inAudio">Elegir audio</label><label class="btn" for="inSrt">Elegir SRT</label></div>
+    </div>
+  </div>
+  <div class="sheet-ft" id="libFt">
+    <label class="btn primary lg" for="inAudio">Elegir audio</label>
+    <label class="btn lg" for="inSrt">Elegir SRT</label>
+  </div>
+</aside>
+
+<div class="modal sheet" id="tx" hidden role="dialog" aria-modal="true" aria-labelledby="txTitle">
+  <span class="grab" aria-hidden="true"></span>
+  <div class="sheet-hd">
+    <button class="txtbtn only-sm" id="txBackSm" type="button">Cancelar</button>
+    <h2 id="txTitle">Transcribir<span class="hide-sm"> con Whisper</span></h2>
+    <button class="round hide-sm" id="txClose" type="button" aria-label="Cerrar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="sheet-body">
+    <div class="tx-audio">
+      <span class="tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4M7 7v10M11 4v16M15 8v8M19 10v4"/></svg></span>
+      <span class="tx-info"><span class="tx-nm" id="txName"></span><span class="tx-sub" id="txAudio"></span></span>
+    </div>
+    <div class="callout">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>
+      <span id="txDev"></span>
+    </div>
+    <fieldset class="models" id="txModels"><legend>Modelo</legend><div class="mlist" id="txList"></div></fieldset>
+    <label class="field"><span class="flabel">Idioma del audio</span>
+      <span class="selwrap">
+        <select id="txLang">
+          <option value="spanish">Español</option>
+          <option value="english">Inglés</option>
+          <option value="portuguese">Portugués</option>
+          <option value="french">Francés</option>
+          <option value="italian">Italiano</option>
+          <option value="german">Alemán</option>
+          <option value="">Detectar automáticamente</option>
+        </select>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </span>
+    </label>
+    <p class="fine">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <span>Todo ocurre en tu equipo: el audio no sale del navegador. Cada modelo se descarga una sola vez y queda guardado en este navegador.</span>
+    </p>
+  </div>
+  <div class="sheet-ft tx-ft">
+    <span class="tx-hint" id="txHint"></span>
+    <button class="btn lg hide-sm" id="txBack" type="button">Cancelar</button>
+    <button class="btn primary lg" id="txGo" type="button">Transcribir<span class="only-sm" id="txGoModel"></span></button>
+  </div>
+</div>
+
+<div class="drop" id="drop" hidden><div class="drop-box">
+  <span class="drop-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7 9l5-5 5 5M5 20h14"/></svg></span>
+  <strong>Suelta aquí tu audio y tu SRT</strong>
+  <small>Puedes soltar los dos a la vez</small>
+</div></div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<input type="file" class="vh" id="inAudio" tabindex="-1" aria-hidden="true" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac,.flac,.opus">
+<input type="file" class="vh" id="inSrt" tabindex="-1" aria-hidden="true" accept=".srt,.vtt,text/plain,application/x-subrip">
 
 <script type="module" src="js/main.js"></script>
 </body>

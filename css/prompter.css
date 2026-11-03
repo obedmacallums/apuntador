@@ -1,35 +1,78 @@
-/* The prompter: the lines, the reading arrow at 40%, the word-by-word highlight, and the empty screen. */
-main{position:relative;height:max(340px,calc(100vh - var(--chrome,260px) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));height:max(340px,calc(100dvh - var(--chrome,260px) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)))}
-.scroller{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;
-  -webkit-mask-image:linear-gradient(transparent 0,#000 18%,#000 78%,transparent 100%);mask-image:linear-gradient(transparent 0,#000 18%,#000 78%,transparent 100%)}
-.cues{position:relative;max-width:26em;margin:0 auto;padding-block:calc(var(--sh,60vh) * .4) calc(var(--sh,60vh) * .55);font-size:var(--fs);line-height:1.38;transition:transform .25s}
+/* The prompter: the lines, the current line (kept at 40% of the height), the word-by-word highlight,
+   and the empty screen. */
+main{position:relative;flex:none;height:max(300px,calc(100vh - var(--chrome,260px)));height:max(300px,calc(100dvh - var(--chrome,260px)))}
+.scroller{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding:0 max(24px,var(--sar)) 0 max(24px,var(--sal));
+  -webkit-mask-image:linear-gradient(transparent 0,#000 18%,#000 82%,transparent 100%);mask-image:linear-gradient(transparent 0,#000 18%,#000 82%,transparent 100%)}
+.scroller::-webkit-scrollbar{display:none}
+.cues{position:relative;max-width:22em;margin:0 auto;padding-block:calc(var(--sh,60vh) * .4) calc(var(--sh,60vh) * .55);font-size:var(--fs);line-height:1.28;font-weight:600;letter-spacing:-.02em;transition:transform .25s}
 .mirror .cues{transform:scaleX(-1)}
-.cue{margin:0 0 .35em;padding:.18em .45em;border-radius:.25em;color:var(--ink-soft);cursor:pointer;transition:color .25s,background-color .25s;text-wrap:pretty}
-.cue:hover{background:color-mix(in srgb,var(--cue-wash) 60%,transparent)}
-.cue.past{color:var(--ink-dim)}
-.cue.active{color:var(--ink);background:var(--cue-wash)}
-.cue.pending{cursor:default;font-size:.6em;font-style:italic;color:var(--ink-dim)}
-.cue.pending.active{color:var(--ink-soft)}
-.cue.pending::after{content:"";display:inline-block;width:.6em;height:.6em;margin-left:.4em;border-radius:50%;background:var(--cue);vertical-align:middle;animation:pulse 1.2s ease-in-out infinite}
+.cue{position:relative;margin:0 0 .04em;padding:.26em .64em;border-radius:.55em;color:var(--soft);cursor:pointer;transition:color .25s,background-color .25s;text-wrap:pretty}
+.cue:hover{background:color-mix(in srgb,var(--wash) 50%,transparent)}
+.cue.past{color:var(--dim)}
+.cue.active{color:var(--ink);background:var(--wash)}
+.cue.active::before{content:"";position:absolute;left:-14px;top:50%;width:6px;height:28px;margin-top:-14px;border-radius:3px;background:var(--accent)}
+.cue.pending{cursor:default;font-size:.55em;font-weight:500;letter-spacing:0;font-style:italic;color:var(--dim)}
+.cue.pending.active{color:var(--soft)}
+.cue.pending::after{content:"";display:inline-block;width:.6em;height:.6em;margin-left:.4em;border-radius:50%;background:var(--accent);vertical-align:middle;animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.25}}
-.tc{display:block;font-family:var(--f-mono);font-size:max(11px,.3em);letter-spacing:.04em;color:var(--ink-dim);margin-bottom:.15em;font-variant-numeric:tabular-nums}
-.cue.active .tc{color:var(--cue)}
-.karaoke .cue.active .w{color:var(--ink-soft);transition:color .12s}
-.karaoke .cue.active .w.on,.karaoke .cue.active .w.now{color:var(--ink)}
-.karaoke .cue.active .w.now{text-decoration:underline;text-decoration-color:var(--cue);text-decoration-thickness:.08em;text-underline-offset:.18em}
-.reading{position:absolute;left:0;right:0;top:40%;height:0;pointer-events:none}
-.reading::before,.reading::after{content:"";position:absolute;top:-7px;border:7px solid transparent}
-.reading::before{left:max(4px,env(safe-area-inset-left,0px));border-left-color:var(--cue)}
-.reading::after{right:max(4px,env(safe-area-inset-right,0px));border-right-color:var(--cue)}
 
-/* Empty screen */
-.empty{position:absolute;inset:0;display:flex;overflow-y:auto;text-align:center;padding:24px}
-.empty>div{margin:auto;max-width:30em;display:grid;gap:10px;justify-items:center}
-.empty h2{margin:0;font-size:22px;text-wrap:balance}
-.empty p{margin:0;color:var(--ink-soft);line-height:1.5}
-.empty .nacts{margin:6px 0 0;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-/* An audio's saved texts, to pick one */
-.choices{display:grid;gap:8px;width:min(26em,calc(100vw - 48px));margin-top:6px}
-.choice{display:grid;gap:5px;text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:12px 14px;cursor:pointer;min-width:0;font:inherit}
-.choice:hover,.choice:focus-visible{border-color:var(--cue)}
-.follow{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);border:0;border-radius:999px;padding:10px 18px;background:var(--ink);color:var(--bg);font-size:14px;font-weight:700;cursor:pointer;box-shadow:var(--shadow);display:flex;gap:8px;align-items:center;white-space:nowrap}
+/* Word by word: what was said is ink, what is coming is soft, and the word being said is marked
+   without color: a dark pill with light text (w-fondo), or underlined (w-sub). */
+.karaoke .cue.active .w{color:var(--soft);transition:color .12s}
+.karaoke .cue.active .w.on,.karaoke .cue.active .w.now{color:var(--ink)}
+.w-fondo .karaoke .cue.active .w.now{background:var(--ink);color:var(--bg);border-radius:.2em;padding:0 .14em;margin:0 -.14em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.w-sub .karaoke .cue.active .w.now{text-decoration:underline;text-decoration-thickness:.09em;text-underline-offset:.16em}
+
+.follow{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:2;display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 18px 0 14px;border:0;border-radius:22px;background:var(--accent);color:var(--on-accent);font-size:14px;font-weight:600;white-space:nowrap;box-shadow:var(--shadow);cursor:pointer}
+.follow svg{width:18px;height:18px}
+
+/* Empty screen: nothing to read yet. Built by screen.js. */
+.empty{position:absolute;inset:0;display:flex;overflow-y:auto;padding:32px max(24px,var(--sar)) 32px max(24px,var(--sal))}
+.empty-in{margin:auto;width:100%;max-width:560px;display:flex;flex-direction:column;align-items:center;gap:28px}
+.e-head{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.e-ic{width:76px;height:76px;border-radius:22px;background:var(--wash);color:var(--accent);display:grid;place-items:center}
+.e-ic svg{width:34px;height:34px}
+.e-head h1{font-size:30px;font-weight:700;letter-spacing:-.025em;text-wrap:balance}
+.e-head p{max-width:460px;font-size:16px;line-height:1.5;color:var(--soft);text-wrap:pretty}
+.e-drop{width:100%;display:flex;flex-direction:column;align-items:center;gap:18px;padding:32px 24px;border-radius:28px;border:2px dashed var(--line);background:var(--surface);text-align:center}
+.e-drop>svg{width:30px;height:30px;color:var(--soft)}
+.e-drop strong{display:block;font-size:17px;font-weight:600}
+.e-drop small{display:block;margin-top:4px;font-size:14px;color:var(--soft)}
+.e-acts{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+.e-acts .btn{height:50px;padding:0 26px;border-radius:25px;font-size:16px}
+.e-stack{width:100%;max-width:340px;display:flex;flex-direction:column;gap:10px}
+.e-stack .btn{height:52px;border-radius:26px;font-size:16px}
+.e-stack .txtbtn{font-size:15px}
+.e-list{width:100%;display:flex;flex-direction:column;gap:8px}
+.e-list-hd{display:flex;align-items:baseline;justify-content:space-between;padding:0 8px}
+.e-list-hd h2{font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--soft)}
+.e-list-hd .txtbtn{height:36px;padding:0;font-size:14px}
+.rows{border-radius:20px;background:var(--surface);overflow:hidden}
+.rowbtn{width:100%;display:flex;align-items:center;gap:14px;padding:12px 16px;border:0;background:transparent;color:var(--ink);text-align:left;cursor:pointer;min-width:0}
+.rowbtn+.rowbtn{border-top:1px solid var(--line)}
+.rowbtn:hover{background:var(--raise)}
+.rowbtn .r-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.rowbtn .r-nm{font-size:16px;font-weight:600}
+.rowbtn .r-mt{font-size:13px;color:var(--soft)}
+.rowbtn>svg{flex:none;width:18px;height:18px;color:var(--dim)}
+.rowbtn .bar{margin-top:4px}
+
+/* A progress bar (library and the list of an audio's texts). */
+.bar{display:block;height:4px;border-radius:2px;background:var(--raise);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+
+@media (max-width:619px){
+  .scroller{padding:0 max(22px,var(--sar)) 0 max(22px,var(--sal));-webkit-mask-image:linear-gradient(transparent,#000 14%,#000 86%,transparent);mask-image:linear-gradient(transparent,#000 14%,#000 86%,transparent)}
+  .cue{margin:0 -.4em .04em;padding:.24em .4em;border-radius:.6em;line-height:1.26}
+  .cue.active::before{display:none}
+  .follow{bottom:12px}
+  .empty{padding:24px max(20px,var(--sar)) 24px max(20px,var(--sal))}
+  .empty-in{gap:22px}
+  .e-ic{width:64px;height:64px;border-radius:18px}
+  .e-head h1{font-size:24px}
+  .e-head p{font-size:15px}
+  .e-drop{padding:24px 16px;border-style:solid;border-width:1px}
+  .e-drop>svg,.e-drop>span{display:none}
+  .e-acts{width:100%;flex-direction:column}
+  .e-acts .btn{width:100%}
+}

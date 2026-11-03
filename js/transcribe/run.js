@@ -1,7 +1,7 @@
 // Running a transcription: the worker, the lines appearing as they come, and saving the result as a
 // new text of the audio, next to any texts it already had.
 import { state } from '../state.js';
-import { $, nbtn, toast } from '../ui.js';
+import { $, el, nbtn, toast } from '../ui.js';
 import { fmt, hash, mb } from '../format.js';
 import { toSrt } from '../srt.js';
 import { S, save, txPrefs, updateDevNote } from '../settings.js';
@@ -10,8 +10,9 @@ import { Store } from '../library/texts.js';
 import { rememberAudio } from '../library/audios.js';
 import { now, loadedFile } from '../player.js';
 import { appendCues, markDirty, render, renderSegs, setFollow, setPending } from '../prompter.js';
-import { adoptText, openScript, persistPos, showTextName } from '../session.js';
-import { updateEmpty, updateNotice } from '../screen.js';
+import { adoptText, openScript, persistPos } from '../session.js';
+import { noticeFrame, updateEmpty, updateNotice } from '../screen.js';
+import { updateChip } from '../chip.js';
 import { MODEL_INFO, RUNTIME } from './models.js';
 import { cachedVariants, deviceInfo, planModel } from './device.js';
 import { decodeAudio, splitWindows } from './audio.js';
@@ -24,22 +25,21 @@ export const TX = { running: false, worker: null, reject: null, live: false, upt
 // The "Transcribir" button shows when there is an audio and nothing is being transcribed.
 export function updateTxBtn() {
   $('txBtn').hidden = state.mode !== 'audio' || TX.running;
-  updateEmpty();
+  updateEmpty(); updateChip();
 }
 
-// Progress in the notice bar, with a Cancel button. frac: 0–1, or null for no bar.
-function txNotice(text, frac) {
-  const box = $('notice'), txt = $('noticeText'), acts = $('noticeActs');
-  txt.textContent = ''; acts.textContent = '';
-  const s = document.createElement('span'); s.className = 'tx-msg'; s.textContent = text;
-  txt.append(s);
-  if (frac != null) {
-    const bar = document.createElement('span'); bar.className = 'prog';
-    const i = document.createElement('i'); i.style.width = Math.round(Math.min(1, frac) * 100) + '%';
-    bar.append(i); acts.append(bar);
-  }
-  acts.append(nbtn('Cancelar', () => txCancel('Transcripción cancelada.')));
-  box.hidden = false;
+// Progress in the notice card: what is happening, a line under it, Cancel, and a bar.
+// frac: 0–1, or null while there is no way to tell (the bar keeps moving).
+function txNotice(ic, title, sub, frac) {
+  noticeFrame(ic, true);
+  $('noticeText').append(el('span', 'n-t', title));
+  if (sub) $('noticeText').append(el('span', 'n-s', sub));
+  $('noticeActs').append(nbtn('Cancelar', () => txCancel('Transcripción cancelada.')));
+  const bar = $('noticeBar');
+  bar.hidden = false;
+  bar.classList.toggle('indet', frac == null);
+  bar.firstElementChild.style.width = frac == null ? '' : Math.round(Math.min(1, frac) * 100) + '%';
+  $('notice').hidden = false;
 }
 // Send the worker a message; resolves on 'ready' or 'done', passes every other message to onEvent.
 function txCall(msg, transfer, onEvent) {
@@ -70,7 +70,7 @@ function leaveLive() {
   TX.live = false; setPending(null);
   const prev = TX.prev; TX.prev = null;
   if (prev) openScript(prev.meta, prev.cues, true);
-  else { state.cues = []; state.userSrt = false; render(); showTextName(null); }
+  else { state.cues = []; state.userSrt = false; render(); updateChip(); }
 }
 
 export async function startTx() {
@@ -87,19 +87,19 @@ export async function startTx() {
   persistPos(0);
   TX.running = true; updateTxBtn();
   try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
-  txNotice('Preparando Whisper ' + label + '…', 0);
+  txNotice('spin', `Preparando Whisper ${label}…`, '', null);
   let stage = 'prepare';
   try {
     const decoding = decodeAudio(file);
     TX.worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
     const model = { id: plan.m.id, device: v.device, dtype: v.dtype, files: v.files, size: v.size };
     await txCall({ type: 'prepare', runtime: RUNTIME, model }, [], d => {
-      if (d.type === 'download' && d.done < d.total) txNotice(`Descargando el modelo ${label}: ${mb(d.done)} de ${mb(d.total)}. Solo la primera vez.`, d.done / d.total);
-      if (d.type === 'stage') txNotice(`Cargando el modelo ${label}…` + (v.size > 5e8 ? ' Con los modelos grandes puede tardar un minuto.' : ''), null);
+      if (d.type === 'download' && d.done < d.total) txNotice('down', `Descargando el modelo ${label} · ${mb(d.done)} de ${mb(d.total)}`, 'Solo la primera vez; luego queda guardado', d.done / d.total);
+      if (d.type === 'stage') txNotice('spin', `Cargando el modelo ${label}…`, v.size > 5e8 ? 'Con los modelos grandes puede tardar un minuto' : '', null);
     });
     if (!TX.running) return;
     stage = 'decode';
-    txNotice('Preparando el audio…', null);
+    txNotice('spin', 'Preparando el audio…', '', null);
     const pcm = await decoding;
     if (!TX.running) return;
     const windows = splitWindows(pcm), total = pcm.length / 16000;
@@ -111,10 +111,10 @@ export async function startTx() {
     TX.live = true; TX.upto = 0;
     setPending('Transcribiendo… el texto aparecerá aquí en unos segundos.');
     render(); setFollow(true);
-    $('srtName').textContent = 'Transcribiendo…'; $('slotSrt').classList.remove('ok');
+    updateChip();
     const t0 = Date.now();
     stage = 'run';
-    txNotice(`Transcribiendo con Whisper ${label}: 0:00 de ${fmt(total)}`, 0);
+    txNotice('wave', `Transcribiendo con Whisper ${label} · 0:00 de ${fmt(total)}`, 'El texto aparece a medida que avanza', 0);
     await txCall({ type: 'run', audio: pcm, windows, language, words: S.txWords }, [pcm.buffer], d => {
       if (d.type !== 'segment' || !TX.running) return;
       TX.upto = d.upto;
@@ -122,8 +122,8 @@ export async function startTx() {
       markDirty();
       setPending(`Transcribiendo… lo que sigue a ${fmt(d.upto)} aparecerá aquí.`);
       const left = (Date.now() - t0) / d.upto * (total - d.upto) / 1000;
-      const eta = left > 90 ? `quedan unos ${Math.round(left / 60)} min` : left > 5 ? 'queda menos de 2 min' : 'casi listo';
-      txNotice(`Transcribiendo con Whisper ${label}: ${fmt(d.upto)} de ${fmt(total)} · ${eta}`, d.upto / total);
+      const eta = left > 90 ? `Quedan unos ${Math.round(left / 60)} minutos` : left > 5 ? 'Queda menos de 2 minutos' : 'Casi listo';
+      txNotice('wave', `Transcribiendo con Whisper ${label} · ${fmt(d.upto)} de ${fmt(total)}`, `${eta} · ya puedes leer lo que está listo`, d.upto / total);
     });
     if (!TX.running) return;
     TX.running = false;

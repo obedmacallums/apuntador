@@ -5,6 +5,7 @@ import { stepLine } from './prompter.js';
 import { S, setFs, toggleMirror, togglePanel } from './settings.js';
 import { openLib, closeLib } from './library/panel.js';
 import { closeTx } from './transcribe/dialog.js';
+import { closeMenu } from './chip.js';
 
 function toggleFs() {
   if (!document.fullscreenEnabled) return;
@@ -16,8 +17,8 @@ function onKey(e) {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const tgt = e.target;
   const onControl = tgt.closest && tgt.closest('button, input, label');
-  if (e.key === 'Escape') { togglePanel(false); closeLib(); closeTx(); return; }
-  if (!$('lib').hidden || !$('tx').hidden) return;
+  if (e.key === 'Escape') { togglePanel(false); closeMenu(); closeLib(); closeTx(); return; }
+  if (!$('lib').hidden || !$('tx').hidden || !$('menu').hidden) return;
   if (tgt.type === 'range') return;
   switch (e.key) {
     case ' ':
@@ -41,6 +42,6 @@ export function initControls() {
   $('fwd').onclick = () => seek(now() + 5);
   if (!document.fullscreenEnabled) $('fsBtn').hidden = true;
   $('fsBtn').onclick = toggleFs;
-  $('scrim').onclick = () => { closeLib(); closeTx(); };
+  $('scrim').onclick = () => { closeLib(); closeTx(); togglePanel(false); closeMenu(); };
   document.addEventListener('keydown', onKey);
 }

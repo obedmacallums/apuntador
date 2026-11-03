@@ -3,7 +3,7 @@
 import { state } from './state.js';
 import { S } from './settings.js';
 import { $ } from './ui.js';
-import { fmt, fmtTC } from './format.js';
+import { fmt } from './format.js';
 import { now, duration, seek } from './player.js';
 import { updateEmpty } from './screen.js';
 import { TX } from './transcribe/run.js';
@@ -50,8 +50,6 @@ export function setPending(text) {
 function buildCue(c, i) {
   const p = document.createElement('p');
   p.className = 'cue'; p.dataset.i = i;
-  const tc = document.createElement('span');
-  tc.className = 'tc'; tc.textContent = fmtTC(c.start);
   const tx = document.createElement('span');
   const parts = c.text.split(' ');
   const total = parts.reduce((a, w) => a + w.length + 1, 0);
@@ -62,7 +60,7 @@ function buildCue(c, i) {
     tx.append(s, ' ');
     acc += w.length + 1; ws.push(s); cs.push(acc / total);
   });
-  p.append(tc, tx);
+  p.append(tx);
   els.push(p); words.push(ws); wcum.push(cs);
   return p;
 }
@@ -96,7 +94,8 @@ function setActive(i) {
   });
   if (pendingEl) pendingEl.classList.toggle('active', i === AHEAD);
   active = i; lit = -1;
-  $('counter').innerHTML = n ? `<span class="hide-sm">Línea </span>${Math.min(n, Math.max(0, i) + 1)} / ${n}` : '—';
+  const line = n ? `Línea ${Math.min(n, Math.max(0, i) + 1)} de ${n}` : '—';
+  $('counter').textContent = line; $('counterSm').textContent = line;
   if (follow) scrollToCue(Math.max(0, i), prev === -2);
 }
 function scrollToCue(i, instant) {
@@ -168,11 +167,13 @@ function tick() {
   requestAnimationFrame(tick);
 }
 
-// The prompter fills what the header, notice and transport leave (--chrome); the reading arrow sits
-// at 40% of the scroller's height (--sh).
+// The prompter fills what the header, notice and transport leave (--chrome); the current line sits
+// at 40% of the scroller's height (--sh). Ajustes and the audio menu open under the header (--hd).
 function measureChrome() {
   const h = ['header', '#notice', 'footer'].reduce((a, sel) => a + (document.querySelector(sel)?.offsetHeight || 0), 0);
-  document.documentElement.style.setProperty('--chrome', h + 'px');
+  const root = document.documentElement.style;
+  root.setProperty('--chrome', h + 'px');
+  root.setProperty('--hd', (document.querySelector('header')?.offsetHeight || 72) + 'px');
 }
 
 export function initPrompter() {

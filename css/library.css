@@ -1,38 +1,57 @@
-/* The library panel: each audio with its texts. */
-.lib{position:fixed;z-index:16;top:0;right:0;bottom:0;width:min(420px,100vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow);display:grid;grid-template-rows:auto auto 1fr;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
-.lib-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 10px 4px 20px}
-.lib-hd h2{margin:0;font-size:19px}
-.lib-sub{margin:0;padding:0 20px 14px;font-size:13px;line-height:1.45;color:var(--ink-soft);border-bottom:1px solid var(--line)}
-.lib-body{overflow-y:auto;min-height:0}
-.lib-list{list-style:none;margin:0;padding:8px;display:grid;gap:2px}
-.item{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;border-radius:10px}
-.item:hover{background:var(--raise)}
-.item.on{background:var(--cue-wash)}
-.open{display:grid;gap:5px;text-align:left;border:0;background:transparent;padding:12px;cursor:pointer;min-width:0;border-radius:10px}
-.del{margin-right:8px;height:36px;min-width:36px;padding:0 8px;border:1px solid transparent;border-radius:8px;background:transparent;cursor:pointer;color:var(--ink-soft);display:grid;place-items:center;font-size:13px;font-weight:700}
-.del:hover{border-color:var(--line);color:var(--ink)}
-.del svg{width:18px;height:18px}
-.del.armed{background:var(--tally);color:#fff;border-color:var(--tally)}
-.lib-empty{padding:32px 24px;display:grid;gap:12px;justify-items:start;color:var(--ink-soft);font-size:14px;line-height:1.5}
-.lib-empty strong{color:var(--ink);font-size:16px}
-.lib-empty .nacts{display:flex;gap:8px;flex-wrap:wrap}
-.grp{display:grid;gap:2px;padding:4px 0}
-.grp+.grp{border-top:1px solid var(--line);padding-top:8px}
-.ghd{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;border-radius:10px}
-.ghd:hover{background:var(--raise)}
-.grp.on>.ghd{background:var(--cue-wash)}
-.gopen{display:flex;gap:10px;align-items:center;text-align:left;border:0;background:transparent;color:inherit;font:inherit;padding:10px 12px;cursor:pointer;min-width:0;border-radius:10px}
-.gic{flex:none;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--cue-wash);color:var(--cue)}
-.gic svg{width:16px;height:16px}
-.ginfo{display:grid;gap:3px;min-width:0}
-.gl{list-style:none;margin:0;padding:0 0 0 30px;display:grid;gap:2px}
-.gl.loose{padding-left:0}
-.gl .open{padding:9px 12px}
-.gl .nm{font-size:14px}
-.gl .del{margin-right:4px}
-.gl .del:last-child{margin-right:8px}
-.gtitle{padding:8px 12px 4px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft)}
+/* The library: a panel on the right on wide screens, a sheet on phones. Each audio is a card with its texts. */
+.lib{position:fixed;z-index:17;top:max(16px,var(--sat));right:max(16px,var(--sar));bottom:max(16px,var(--sab));width:min(420px,calc(100vw - 32px));border-radius:28px}
+.lib-hd{flex:none;display:flex;flex-direction:column;gap:4px;padding:20px 16px 12px 24px}
+.lib-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.lib-top h2{font-size:26px;font-weight:700;letter-spacing:-.02em}
+.lib-sub{font-size:13px;line-height:1.45;color:var(--soft)}
+.lib-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.lib-list{display:flex;flex-direction:column;gap:10px;padding:4px 16px 16px}
+.lib-list:empty{display:none}
+.lib-h3{margin:10px 8px 0;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--soft)}
+.lib .sheet-ft .btn{flex:1}
 
-@media (max-width:620px){
-  .lib{top:auto;left:0;width:auto;max-height:82%;border-left:0;border-top:1px solid var(--line);border-radius:16px 16px 0 0;padding-left:env(safe-area-inset-left,0px)}
+/* An audio: its header (open it on its own), its texts, and what else you can do with it. */
+.grp{display:flex;flex-direction:column;border-radius:20px;background:var(--bg);padding:6px}
+.ghd{display:flex;align-items:center;gap:6px;min-width:0}
+.gopen{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:8px 10px;border:0;border-radius:14px;background:transparent;color:var(--ink);text-align:left;cursor:pointer}
+.gopen:hover{background:color-mix(in srgb,var(--ink) 5%,transparent)}
+.ginfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ginfo .g-nm{font-size:15px;font-weight:600}
+.ginfo .g-mt{font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gopen>svg{flex:none;width:18px;height:18px;color:var(--dim)}
+.ghd>.btn{margin-right:6px}
+.gl{display:flex;flex-direction:column;gap:2px;padding-top:2px}
+.item{display:flex;align-items:center;gap:4px;padding:0 6px 0 0;border-radius:14px;background:var(--surface);min-width:0}
+.item .open{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;padding:10px 6px 10px 12px;border:0;border-radius:14px;background:transparent;color:var(--ink);text-align:left;cursor:pointer}
+.item .open:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}
+.i-top{display:flex;align-items:center;gap:8px;min-width:0}
+.i-nm{font-size:14px;font-weight:600}
+.i-tag{flex:none;height:20px;padding:0 8px;border-radius:10px;background:var(--wash);color:var(--accent);font-size:11px;font-weight:600;display:grid;place-items:center}
+.i-mt{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums;min-width:0}
+.i-mt>span:first-child{flex:none}
+.i-mt .bar{flex:1;min-width:24px}
+.del{flex:none;width:40px;height:44px;border:0;border-radius:12px;background:transparent;color:var(--soft);display:grid;place-items:center;cursor:pointer;padding:0;font-size:12px;font-weight:600;white-space:nowrap}
+.del svg{width:18px;height:18px}
+.del:hover{color:var(--ink);background:var(--raise)}
+.del.armed{width:auto;padding:0 12px;background:var(--live);color:#fff}
+.gft{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px 0 12px}
+.gft .link{height:40px}
+.gft .link.armed{color:var(--live);font-weight:600}
+
+.lib-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:100%;padding:16px 28px 40px;text-align:center;font-size:14px;line-height:1.5;color:var(--soft)}
+.lib-empty strong{font-size:17px;font-weight:600;color:var(--ink)}
+.lib-empty .tile{background:var(--raise);color:var(--soft)}
+.lib-empty .acts{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:6px}
+.lib-empty .btn{height:44px;padding:0 18px;border-radius:22px;font-size:14px}
+.lib:has(#libEmpty:not([hidden])) .sheet-ft{display:none}
+
+@media (max-width:619px){
+  .lib{top:auto;right:0;bottom:0;width:auto;height:calc(100dvh - var(--sat) - 40px);max-height:none;background:var(--bg)}
+  .lib-hd{padding:6px 16px 10px 20px}
+  .lib-top h2{font-size:22px}
+  .lib-list{padding:4px 12px 16px}
+  .grp{background:var(--surface)}
+  .item{background:var(--bg)}
+  .lib .sheet-ft{flex-direction:row}
+  .lib .sheet-ft .btn.lg{height:50px;font-size:16px}
 }

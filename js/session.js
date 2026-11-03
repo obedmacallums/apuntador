@@ -1,6 +1,5 @@
 // The open text: opening and closing it, giving it its audio, and remembering where you left it.
 import { state } from './state.js';
-import { $ } from './ui.js';
 import { keyOf } from './library/data.js';
 import { Store } from './library/texts.js';
 import { rememberAudio, storedAudio, AudioStore, fileOf } from './library/audios.js';
@@ -8,17 +7,13 @@ import { renderLib } from './library/panel.js';
 import { now, duration, pause, seekWhenReady, loadedKey, setAudio, isPlaying } from './player.js';
 import { render, setFollow } from './prompter.js';
 import { updateNotice } from './screen.js';
+import { updateChip } from './chip.js';
 
 let lastSavedPos = -1, saveTimer = 0;
 
 // The audio playing is the open text's own.
 export const ownsAudio = () => !!state.currentId && !!state.currentMeta.audioKey && state.currentMeta.audioKey === loadedKey();
 
-// The "Texto" slot in the header: the open text's file name, or the prompt to choose one.
-export function showTextName(name) {
-  $('srtName').textContent = name || 'Elegir SRT';
-  $('slotSrt').classList.toggle('ok', !!name);
-}
 
 // Show a text. keepPlayback: do not pause or jump (the audio playing already goes with this text).
 export function openScript(meta, list, keepPlayback) {
@@ -26,7 +21,7 @@ export function openScript(meta, list, keepPlayback) {
   state.cues = list; state.userSrt = true;
   state.currentId = meta.id; state.currentMeta = { ...meta };
   render();
-  showTextName(meta.file || meta.name);
+  updateChip();
   if (keepPlayback) { state.resumeFrom = 0; lastSavedPos = -1; }
   else {
     const pos = meta.pos || 0, dur = meta.dur || duration();
@@ -44,7 +39,7 @@ export function openScript(meta, list, keepPlayback) {
 export function adoptText(meta) {
   state.currentId = meta.id; state.currentMeta = { ...meta };
   state.userSrt = true; state.resumeFrom = 0; lastSavedPos = meta.pos;
-  showTextName(meta.file);
+  updateChip();
 }
 
 // Close the text on screen. It stays in the library. An audio left in the player is what the next
@@ -52,7 +47,7 @@ export function adoptText(meta) {
 export function closeScript() {
   persistPos(0);
   state.cues = []; state.userSrt = false; state.currentId = null; state.currentMeta = null; state.resumeFrom = 0;
-  render(); showTextName(null);
+  render(); updateChip();
   const key = loadedKey();
   Store.setLast(key && storedAudio.has(key) ? key : null);
   updateNotice(); renderLib();

@@ -1,6 +1,6 @@
 # Apuntador de Audio
 
-Teleprompter que sigue un audio línea a línea. Cargas un MP3 (o M4A, WAV, OGG…) y su archivo de subtítulos `.srt` o `.vtt`. La línea que suena queda siempre a la altura de la flecha y se resalta palabra a palabra. Si no tienes el SRT, la app puede **transcribir el audio con Whisper dentro del navegador**: el audio nunca sale de tu equipo.
+Teleprompter que sigue un audio línea a línea. Cargas un MP3 (o M4A, WAV, OGG…) y su archivo de subtítulos `.srt` o `.vtt`. La línea que suena queda siempre a la misma altura y se resalta palabra a palabra. Si no tienes el SRT, la app puede **transcribir el audio con Whisper dentro del navegador**: el audio nunca sale de tu equipo.
 
 Es una página estática (HTML, CSS y JavaScript sin dependencias de build), lista para GitHub Pages.
 
@@ -9,6 +9,9 @@ Es una página estática (HTML, CSS y JavaScript sin dependencias de build), lis
 - Seguimiento automático de la línea activa, con resaltado palabra a palabra. Es exacto en lo transcrito con tiempos por palabra; en los SRT, se estima.
 - Toca una línea para saltar a ese momento. Si te desplazas a mano, el seguimiento se pausa hasta que pulses «Volver a la línea actual».
 - Tamaño de letra, velocidad (0,75× a 2×), ajuste de sincronía en décimas de segundo y modo espejo para cristales de teleprompter.
+- Temas: Claro y Papel para el día, Oscuro y Medianoche para la noche, y seis colores de acento. En modo Automático el tema cambia solo con el modo claro u oscuro del dispositivo.
+- Diseño para computadora, iPad y teléfono: en pantallas anchas (620 px o más) Transcribir es una ventana centrada, la Biblioteca un panel a la derecha y Ajustes cae bajo su botón; en los teléfonos todo sube como hoja desde abajo, con los botones siempre a la vista.
+- Los nombres de archivo largos se recortan por el medio, para que siempre se vea el final y la extensión.
 - Biblioteca por audio: cada audio se guarda con todos sus textos (SRT y transcripciones de distintos modelos), cada uno con el punto donde te quedaste. Al volver a cargar un audio aparecen sus textos para elegir.
 - Transcripción con Whisper en español, inglés, portugués, francés, italiano, alemán o detección automática. Los modelos disponibles están en la tabla de abajo.
 
@@ -79,7 +82,7 @@ La biblioteca se organiza por audio. Cada audio que cargas se guarda una sola ve
 - **Al cargar un audio** que ya usaste, la pantalla lista sus textos guardados para elegir cuál leer. Si no tiene ninguno, ofrece transcribirlo o elegir su SRT, y lo que hagas queda guardado junto al audio.
 - **Al recargar la página** vuelve lo último que tenías: un texto con su audio, o un audio solo con su lista de textos.
 - **En la biblioteca** pulsas un audio para cargarlo y ver sus textos, o un texto para abrirlo directamente. Si cambias a otro texto del mismo audio mientras suena, el audio sigue donde iba, sin pausas.
-- **Cada texto se descarga como `.srt`** con el botón de la flecha: así sacas del navegador lo que escribió Whisper.
+- **Cada texto se descarga como `.srt`** con el botón de descarga de la biblioteca: así sacas del navegador lo que escribió Whisper.
 - **Borrar un audio** borra también todos sus textos. Borrar un texto deja el audio y sus otros textos.
 - **Un audio se reconoce por su nombre y tamaño.** Si lo vuelves a elegir desde otra carpeta es el mismo; si lo renombras o lo vuelves a exportar, cuenta como otro.
 - **Los textos cuyo audio no está guardado** (por falta de espacio, o de versiones anteriores de la app) aparecen al final, en «Textos sin audio guardado». Al elegirles un audio pasan a ese audio.
@@ -166,25 +169,26 @@ El código son módulos de JavaScript (`import`/`export`) que el navegador carga
 index.html                Marcado de la app
 favicon.svg
 css/
-  base.css                Colores (claro y oscuro), botones y piezas comunes
-  shell.css               Cabecera, aviso y controles de reproducción
-  prompter.css            Las líneas, la flecha de lectura y la pantalla vacía
+  base.css                Temas y acentos, botones, hojas y piezas comunes
+  shell.css               Cabecera, botón del audio y su menú, aviso, reproducción
+  prompter.css            Las líneas, el resaltado y la pantalla vacía
   settings.css            Panel de Ajustes
   transcribe.css          Ventana de transcripción
   library.css             Biblioteca
 js/
   main.js                 Arranque: conecta los módulos y reabre lo último
   state.js                Lo que está en pantalla, compartido entre módulos
-  ui.js                   $, el(), avisos (toast)
-  format.js               Formatos de tiempo y tamaño, hash          (puro)
+  ui.js                   $, el(), iconos, nombres recortados, avisos (toast)
+  format.js               Tiempo, tamaño, hash, cortar nombres largos (puro)
   srt.js                  Leer y escribir SRT/VTT                      (puro)
   pairing.js              Reglas de qué texto va con qué audio         (puro)
   player.js               El reloj: archivo de audio o simulado
   prompter.js             Líneas, resaltado palabra a palabra, barra de tiempo
-  screen.js               El aviso y la pantalla vacía (lista de textos de un audio)
+  screen.js               El aviso y la pantalla vacía (bienvenida, textos de un audio)
   session.js              El texto abierto: abrir, cerrar, su audio, posición
   files.js                Elegir o arrastrar archivos
-  settings.js             Ajustes guardados y su panel
+  settings.js             Ajustes guardados, temas y su panel
+  chip.js                 El botón del audio y texto abiertos, y su menú
   controls.js             Botones, teclado y pantalla completa
   library/
     data.js               Registros: clave de audio, nombres, agrupar  (puro)
@@ -233,7 +237,7 @@ La app no incluye binarios en el repositorio. Los carga desde estos servicios:
 
 - **[transformers.js](https://github.com/huggingface/transformers.js) 3.8.1** y su runtime ONNX en WASM, desde jsDelivr (versión fija en `js/transcribe/models.js`, constante `TJS_VERSION`).
 - **Modelos** desde Hugging Face: [`whisper-tiny_timestamped`](https://huggingface.co/onnx-community/whisper-tiny_timestamped), [`whisper-base_timestamped`](https://huggingface.co/onnx-community/whisper-base_timestamped), [`whisper-small_timestamped`](https://huggingface.co/onnx-community/whisper-small_timestamped) y [`whisper-large-v3-turbo_timestamped`](https://huggingface.co/onnx-community/whisper-large-v3-turbo_timestamped), de onnx-community.
-- **Fuentes** Atkinson Hyperlegible e IBM Plex Mono, desde Google Fonts.
+- **Fuente** del sistema (San Francisco en Apple); Inter, desde Google Fonts, donde no la hay.
 
 Si cambias de versión de transformers.js, actualiza también `RUNTIME.wasmSize` en `js/transcribe/models.js`. Ese tamaño solo se usa para la barra de progreso.
 

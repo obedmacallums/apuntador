@@ -7,6 +7,7 @@ import { markDirty, renderSegs, setFollow } from './prompter.js';
 import { onPlayback, schedulePersist } from './session.js';
 import { updateNotice } from './screen.js';
 import { updateTxBtn } from './transcribe/run.js';
+import { updateChip } from './chip.js';
 
 // The <audio> element. Only this module changes what it plays; others may read it.
 // audio._file is the File playing and audio._key its library key.
@@ -82,8 +83,7 @@ export function setAudio(f, keepPos) {
   state.mode = 'audio';
   demo.playing = false;
   pendingSeek = keep > 0 ? keep : null;
-  $('audioName').textContent = f.name; $('slotAudio').classList.add('ok');
-  updateNotice(); updateTxBtn();
+  updateNotice(); updateTxBtn(); updateChip();
   setFollow(true); markDirty(); onPlayState();
 }
 // Take the audio out of the player (it belongs to another text). The text stays, on the simulated clock.
@@ -96,16 +96,14 @@ export function unloadAudio() {
   if (audioUrl) URL.revokeObjectURL(audioUrl);
   audioUrl = null; audio._file = null; audio._key = null;
   state.mode = 'demo'; demo.t = t; demo.playing = false;
-  $('audioName').textContent = 'Elegir MP3'; $('slotAudio').classList.remove('ok');
-  updateTxBtn(); markDirty(); onPlayState();
+  updateTxBtn(); updateChip(); markDirty(); onPlayState();
 }
 
-// Play/pause button, "on air" tally, keeping the screen awake while playing.
+// Play/pause button, and keeping the screen awake while playing.
 export async function onPlayState() {
   const p = isPlaying();
   $('icPlay').toggleAttribute('hidden', p); $('icPause').toggleAttribute('hidden', !p);
   $('play').setAttribute('aria-label', p ? 'Pausar' : 'Reproducir');
-  $('tally').classList.toggle('on', p);
   markDirty();
   onPlayback(p);
   try {

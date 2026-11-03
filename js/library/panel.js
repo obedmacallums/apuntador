@@ -1,6 +1,6 @@
 // The library panel: each audio with its texts, and what you can do with them (open, download, delete).
 import { state } from '../state.js';
-import { $, el, toast } from '../ui.js';
+import { $, el, icon, midName, toast } from '../ui.js';
 import { ago, fmt, plural } from '../format.js';
 import { toSrt } from '../srt.js';
 import { forLibraryText } from '../pairing.js';
@@ -12,16 +12,19 @@ import { render } from '../prompter.js';
 import { openScript, closeScript, pairAudio, restoreAudio, persistPos, ownsAudio } from '../session.js';
 import { updateEmpty, updateNotice } from '../screen.js';
 import { togglePanel } from '../settings.js';
+import { closeMenu, updateChip } from '../chip.js';
 import { TX, txCancel } from '../transcribe/run.js';
+import { openTx } from '../transcribe/dialog.js';
 
-const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
-const DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>';
-const NOTE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>';
-
-// A delete button that asks for a second tap before doing anything.
-function delBtn(label, armedText, onConfirm) {
-  const del = el('button', 'del');
-  const reset = () => { del.classList.remove('armed'); del.innerHTML = TRASH; del.setAttribute('aria-label', label); del.title = 'Borrar'; };
+// A delete button that asks for a second tap before doing anything: a trash icon, or a text link.
+function delBtn(label, armedText, onConfirm, text) {
+  const del = el('button', text ? 'link' : 'del');
+  del.type = 'button';
+  const reset = () => {
+    del.classList.remove('armed');
+    if (text) del.textContent = text; else del.replaceChildren(icon('trash'));
+    del.setAttribute('aria-label', label); del.title = label;
+  };
   reset();
   del.onclick = async () => {
     if (!del.classList.contains('armed')) {
@@ -35,51 +38,84 @@ function delBtn(label, armedText, onConfirm) {
   return del;
 }
 
-// One text as a button: what it is, how far you got, how long. In the library and on an audio's screen.
-export function textButton(m, title, cls) {
-  const b = el('button', cls);
-  const mt = el('span', 'mt');
-  mt.append(el('em', '', progress(m, state.currentId)), ` · ${plural(m.count, 'línea', 'líneas')} · ${ago(m.updatedAt || Date.now())}`);
+// How far you got in a text, and how long it is: "Ibas en 1:42 · 48 líneas · ayer".
+export const textMeta = m => `${progress(m, null)} · ${plural(m.count, 'línea', 'líneas')} · ${ago(m.updatedAt || Date.now())}`;
+export function progressBar(m) {
   const bar = el('span', 'bar'), fill = el('i');
   fill.style.width = (m.dur ? Math.min(100, (m.pos || 0) / m.dur * 100) : 0) + '%';
   bar.append(fill);
-  b.append(el('span', 'nm', title), mt, bar);
-  b.onclick = () => openFromLib(m);
-  return b;
+  return bar;
 }
+
+// One text in the library: its name (with "Abierto" when it is on screen), how far you got, and its
+// buttons to download it as .srt or delete it.
 function textItem(m, title) {
-  const li = el('li', 'item' + (m.id === state.currentId ? ' on' : ''));
+  const open = m.id === state.currentId;
+  const row = el('div', 'item');
+  const b = el('button', 'open');
+  b.type = 'button';
+  const top = el('span', 'i-top');
+  top.append(midName(title, 'i-nm'));
+  if (open) top.append(el('span', 'i-tag', 'Abierto'));
+  const mt = el('span', 'i-mt');
+  mt.append(el('span', '', textMeta(m)));
+  if ((m.pos || 0) > 3 && progress(m, null) !== 'Terminado') mt.append(progressBar(m));
+  b.append(top, mt);
+  b.onclick = () => openFromLib(m);
   const dl = el('button', 'del');
-  dl.innerHTML = DOWN; dl.title = 'Descargar .srt'; dl.setAttribute('aria-label', `Descargar ${title} como .srt`);
+  dl.type = 'button'; dl.append(icon('down'));
+  dl.title = 'Descargar .srt'; dl.setAttribute('aria-label', `Descargar ${title} como .srt`);
   dl.onclick = () => downloadSrt(m);
-  li.append(textButton(m, title, 'open'), dl, delBtn(`Borrar ${title}`, 'Borrar', async () => {
+  row.append(b, dl, delBtn(`Borrar ${title}`, 'Borrar', async () => {
     await Store.remove(m);
     if (m.id === state.currentId) closeScript();   // its audio stays loaded: the screen lists its other texts
     if (TX.prev && TX.prev.meta.id === m.id) TX.prev = null;   // nothing to bring back after a cancel
     toast(`«${title}» se borró de tu biblioteca.`);
   }));
-  return li;
+  return row;
 }
+
+// Load an audio (if it is not already) and open the transcription window for it.
+async function transcribeAudio(key) {
+  if (loadedKey() !== key) await openAudio(key);
+  if (loadedKey() === key) openTx();
+}
+
+// An audio: open it on its own (the screen lists its texts), its texts, and what else to do with it.
 function audioGroup(a, texts) {
-  const li = el('li', 'grp' + (a.key === loadedKey() ? ' on' : ''));
+  const on = a.key === loadedKey();
+  const sec = el('section', 'grp' + (on ? ' on' : ''));
   const hd = el('div', 'ghd');
   const open = el('button', 'gopen');
-  open.title = 'Cargar este audio y ver sus textos';
-  const ic = el('span', 'gic'); ic.innerHTML = NOTE;
+  open.type = 'button'; open.title = 'Cargar este audio y ver sus textos';
+  const tile = el('span', 'tile' + (on ? '' : ' mute')); tile.append(icon('note'));
   const info = el('span', 'ginfo');
   const what = texts.length ? plural(texts.length, 'texto', 'textos') : 'sin texto todavía';
-  info.append(el('span', 'nm', a.name), el('span', 'mt', (a.dur ? fmt(a.dur) + ' · ' : '') + what));
-  open.append(ic, info);
+  info.append(midName(a.name, 'g-nm'), el('span', 'g-mt', (a.dur ? fmt(a.dur) + ' · ' : '') + what + (on ? ' · abierto' : '')));
+  open.append(tile, info, icon('chevR'));
   open.onclick = () => openAudio(a.key);
-  const all = texts.length ? ` y ${texts.length === 1 ? 'su texto' : `sus ${texts.length} textos`}` : '';
-  hd.append(open, delBtn(`Borrar ${a.name}${all}`, texts.length ? 'Borrar todo' : 'Borrar', () => removeAudio(a, all)));
-  li.append(hd);
-  if (texts.length) {
-    const sub = el('ul', 'gl');
-    texts.forEach(m => sub.append(textItem(m, textLabel(m))));
-    li.append(sub);
+  hd.append(open);
+  if (!texts.length && !TX.running) {
+    const tx = el('button', 'btn soft', 'Transcribir');
+    tx.type = 'button'; tx.onclick = () => transcribeAudio(a.key);
+    hd.append(tx);
   }
-  return li;
+  sec.append(hd);
+  if (texts.length) {
+    const sub = el('div', 'gl');
+    texts.forEach(m => sub.append(textItem(m, textLabel(m))));
+    sec.append(sub);
+  }
+  const ft = el('div', 'gft');
+  if (on && texts.length && !TX.running) {
+    const more = el('button', 'link accent', 'Transcribir con otro modelo');
+    more.type = 'button'; more.onclick = () => transcribeAudio(a.key);
+    ft.append(more);
+  } else ft.append(el('span'));
+  const all = texts.length ? ` y ${texts.length === 1 ? 'su texto' : `sus ${texts.length} textos`}` : '';
+  ft.append(delBtn(`Borrar ${a.name}${all}`, texts.length ? 'Sí, borrar con sus textos' : 'Sí, borrar', () => removeAudio(a, all), 'Borrar audio'));
+  sec.append(ft);
+  return sec;
 }
 
 export function renderLib() {
@@ -87,20 +123,20 @@ export function renderLib() {
   const n = list.length + loose.length;
   $('libCount').textContent = n; $('libCount').hidden = !n;
   $('libSub').textContent = !Store.ready ? 'Cargando tu biblioteca…'
-    : Store.kind === 'local' ? 'Tus audios y sus textos, guardados en este navegador: no salen de tu equipo y solo tú los ves.'
-    : 'Este navegador no permite guardar nada.';
+    : Store.kind !== 'local' ? 'Este navegador no permite guardar nada.'
+    : n ? `${plural(Store.audios.length, 'audio', 'audios')} y ${plural(Store.texts.length, 'texto', 'textos')}, guardados en este navegador: no salen de tu equipo.`
+    : 'Tus audios y sus textos, guardados en este navegador: no salen de tu equipo y solo tú los ves.';
   $('libEmpty').hidden = !!n || !Store.ready;
-  const ul = $('libList');
-  ul.textContent = '';
-  for (const { a, texts } of list) ul.append(audioGroup(a, texts));
+  const box = $('libList');
+  box.textContent = '';
+  for (const { a, texts } of list) box.append(audioGroup(a, texts));
   if (loose.length) {
-    const li = el('li', 'grp');
-    li.append(el('div', 'gtitle', list.length ? 'Textos sin audio guardado' : 'Textos'));
-    const sub = el('ul', 'gl loose');
-    loose.forEach(m => { const l = textLabel(m); sub.append(textItem(m, l.startsWith('Whisper') ? `${m.name} · ${l}` : m.name)); });
-    li.append(sub); ul.append(li);
+    if (list.length) box.append(el('h3', 'lib-h3', 'Textos sin su audio'));
+    const sec = el('section', 'grp'), sub = el('div', 'gl');
+    loose.forEach(m => { const l = textLabel(m); sub.append(textItem(m, l.startsWith('Whisper') ? `${m.name} · ${l}` : m.file || m.name)); });
+    sec.append(sub); box.append(sec);
   }
-  updateEmpty();
+  updateEmpty(); updateChip();
 }
 
 // Delete an audio and every text made for it.
@@ -165,14 +201,14 @@ export async function openAudio(key) {
 }
 
 export function openLib() {
-  togglePanel(false);
-  $('lib').hidden = false; $('scrim').hidden = false;
+  togglePanel(false); closeMenu();
+  $('lib').hidden = false;
   $('libBtn').setAttribute('aria-expanded', 'true');
   $('libClose').focus();
 }
 export function closeLib() {
   if ($('lib').hidden) return;
-  $('lib').hidden = true; $('scrim').hidden = true;
+  $('lib').hidden = true;
   $('libBtn').setAttribute('aria-expanded', 'false');
   $('libBtn').focus();
 }
@@ -180,7 +216,6 @@ export function closeLib() {
 export function initLibrary() {
   Store.onChange(renderLib);
   $('libBtn').onclick = openLib;
-  $('emptyLib').onclick = openLib;
   $('libClose').onclick = closeLib;
   // Choosing a file from inside the panel closes it, so the result is visible.
   $('lib').addEventListener('click', e => { if (e.target.closest('label[for="inSrt"], label[for="inAudio"]')) closeLib(); });

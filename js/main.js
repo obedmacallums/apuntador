@@ -7,7 +7,8 @@
 //   screen.js       the notice and the empty screen
 //   session.js      the open text: open, close, its audio, where you left it
 //   files.js        choosing files; pairing.js decides which text goes with which audio
-//   settings.js     settings and the Ajustes panel
+//   settings.js     settings, themes and the Ajustes panel
+//   chip.js         the header's audio-and-text button and its menu
 //   controls.js     transport buttons, keyboard, full screen
 //   library/        saved texts (texts.js) and audios (audios.js), and the panel (panel.js)
 //   transcribe/     Whisper: models, device detection, the dialog, the run, and the worker
@@ -23,13 +24,14 @@ import { Store } from './library/texts.js';
 import { initAudios, migrateAudio, storedAudio } from './library/audios.js';
 import { initLibrary, openAudio, renderLib } from './library/panel.js';
 import { initTranscribe } from './transcribe/dialog.js';
+import { initChip, updateChip } from './chip.js';
 
 // The sample text shown until you choose something, on a simulated clock.
 function sampleCues() {
   const lines = [
     'Hola. Este es un ejemplo con reloj simulado, sin audio de por medio.',
-    'Arriba eliges tu archivo MP3 y su archivo SRT, o los arrastras a esta ventana.',
-    'La línea que suena se marca y se queda siempre a la altura de la flecha.',
+    'Arriba eliges tu audio y su archivo SRT, o los arrastras a esta ventana.',
+    'La línea que suena se marca y se queda siempre a la misma altura.',
     'Con el resaltado palabra a palabra, la frase se ilumina mientras avanza.',
     'Toca cualquier línea para saltar a ese momento del audio.',
     'Si te desplazas a mano, el seguimiento se pausa hasta que pulses «Volver a la línea actual».',
@@ -68,10 +70,12 @@ initSession();
 initLibrary();
 initAudios();
 initTranscribe();
+initChip();
 
 state.cues = sampleCues();
 applySettings();
 render();
+updateChip();
 onPlayState();
 renderLib();
 updateDevNote();
