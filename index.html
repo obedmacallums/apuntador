@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es" class="th-papel ac-azul w-fondo">
+<html lang="es" class="th-papel ac-azul">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -12,7 +12,7 @@
 (function () {
   var s = {}; try { s = JSON.parse(localStorage.getItem('apuntador') || '{}'); } catch (e) {}
   var d = s.mode === 'oscuro' || (s.mode !== 'claro' && matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.className = 'th-' + (d ? s.dark || 'oscuro' : s.light || 'papel') + ' ac-' + (s.accent || 'azul') + (d ? ' dark' : '') + ' w-fondo';
+  document.documentElement.className = 'th-' + (d ? s.dark || 'oscuro' : s.light || 'papel') + ' ac-' + (s.accent || 'azul') + (d ? ' dark' : '');
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -134,6 +134,12 @@
           <span class="step"><button type="button" id="fsDown" aria-label="Texto más pequeño">−</button><output id="fsOut">40 px</output><button type="button" id="fsUp" aria-label="Texto más grande">+</button></span></div>
         <div class="row"><span class="rl">Resaltar palabra a palabra<small>Exacto en lo transcrito; estimado en los SRT</small></span>
           <button class="sw" id="swKaraoke" type="button" role="switch" aria-checked="true" aria-label="Resaltar palabra a palabra"></button></div>
+        <div class="stack"><span class="rl">Palabra que suena</span>
+          <div class="cards" id="wordCards" role="group" aria-label="Cómo se marca la palabra que suena">
+            <button class="card" type="button" data-k="suave" title="La frase se va llenando a medida que avanza"><span class="wpv"><b>La frase se</b> <i>va llenando</i></span><span>Suave</span></button>
+            <button class="card" type="button" data-k="sub" title="La palabra que suena va subrayada"><span class="wpv"><b>La frase</b> <b class="ul">se</b> <i>va llenando</i></span><span>Subrayado</span></button>
+            <button class="card" type="button" data-k="fondo" title="La palabra que suena va con fondo oscuro"><span class="wpv"><b>La frase</b> <b class="bg">se</b> <i>va llenando</i></span><span>Con fondo</span></button>
+          </div></div>
         <div class="row"><span class="rl">Modo espejo<small>Para cristales de teleprompter</small></span>
           <button class="sw" id="swMirror" type="button" role="switch" aria-checked="false" aria-label="Modo espejo"></button></div>
       </div>

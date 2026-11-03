@@ -1,7 +1,7 @@
 /* Base: themes and accents, reset, and pieces used all over: buttons, names, sheets, toast, drop zone. */
 
-/* Themes. The <html> element carries one theme (th-…), one accent (ac-…), "dark" for the night themes
-   and the current-word style (w-fondo or w-sub). settings.js picks them; index.html sets them before the first paint. */
+/* Themes. The <html> element carries one theme (th-…), one accent (ac-…) and "dark" for the night themes.
+   settings.js picks them; index.html sets them before the first paint. */
 .th-claro{--bg:#F2F2F5;--surface:#FFFFFF;--raise:#E9E9EE;--line:rgba(17,17,20,.10);--ink:#111114;--soft:#5C5C66;--dim:#85858F;--glass:rgba(255,255,255,.80);--scrim:rgba(17,17,20,.32);--shadow:0 24px 64px rgba(17,17,20,.16),0 2px 8px rgba(17,17,20,.06);--live:#D93025}
 .th-papel{--bg:#F4EEE3;--surface:#FBF8F2;--raise:#EBE3D4;--line:rgba(60,40,10,.13);--ink:#2A2118;--soft:#665645;--dim:#8E7D66;--glass:rgba(251,248,242,.82);--scrim:rgba(42,33,24,.32);--shadow:0 24px 64px rgba(60,40,10,.16),0 2px 8px rgba(60,40,10,.06);--live:#C8361F}
 .th-oscuro{--bg:#111114;--surface:#1D1D21;--raise:#2B2B31;--line:rgba(255,255,255,.09);--ink:#F4F4F6;--soft:#A3A3AD;--dim:#686872;--glass:rgba(29,29,33,.78);--scrim:rgba(0,0,0,.55);--shadow:0 24px 70px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.4);--live:#FF5A4E}

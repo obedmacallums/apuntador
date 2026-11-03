@@ -17,7 +17,7 @@ const MODE_NOTES = {
   oscuro: 'Siempre el tema de noche, aunque el dispositivo esté en modo claro.'
 };
 const defaults = { fs: innerWidth < 620 ? 30 : 44, karaoke: true, mirror: false, rate: 1, offset: 0, txWords: true,
-  mode: 'auto', light: 'papel', dark: 'oscuro', accent: 'azul' };
+  mode: 'auto', light: 'papel', dark: 'oscuro', accent: 'azul', word: 'suave' };
 // Also kept here: txModel and txLang (last choices for transcribing), txDevice ('auto' | 'gpu' | 'cpu')
 // and gpuFailed (the GPU failed in Auto mode, so Auto uses the CPU until the viewer picks a mode again).
 export const S = { ...defaults };
@@ -27,6 +27,7 @@ if (!MODE_NOTES[S.mode]) S.mode = 'auto';
 if (!LIGHTS[S.light]) S.light = 'papel';
 if (!DARKS[S.dark]) S.dark = 'oscuro';
 if (!ACCENTS[S.accent]) S.accent = 'azul';
+if (!['suave', 'sub', 'fondo'].includes(S.word)) S.word = 'suave';   // how the word being said is marked
 export function save() { try { localStorage.setItem('apuntador', JSON.stringify(S)); } catch (e) {} }
 
 // How transcription should pick GPU or CPU.
@@ -43,7 +44,6 @@ function applyTheme() {
   [...root.classList].forEach(c => { if (/^(th|ac)-/.test(c)) root.classList.remove(c); });
   root.classList.add(theme, 'ac-' + S.accent);
   root.classList.toggle('dark', dark);
-  root.classList.add('w-fondo');
   const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
   if (bg) $('themeColor').setAttribute('content', bg);
 }
@@ -67,6 +67,8 @@ function renderAppearance() {
     box.querySelectorAll('.pv').forEach(pv => { pv.className = 'pv th-' + pv.dataset.t + ' ac-' + S.accent + (pv.dataset.dark ? ' dark' : ''); });
   }
   pressed($('accDots'), S.accent);
+  pressed($('wordCards'), S.word);
+  [...$('wordCards').children].forEach(b => b.disabled = !S.karaoke);
   $('modeNote').textContent = MODE_NOTES[S.mode];
 }
 
@@ -76,6 +78,8 @@ export function applySettings() {
   document.documentElement.style.setProperty('--fs', S.fs + 'px');
   $('fsOut').textContent = S.fs + ' px';
   $('cues').classList.toggle('karaoke', S.karaoke);
+  document.documentElement.classList.toggle('w-sub', S.word === 'sub');
+  document.documentElement.classList.toggle('w-fondo', S.word === 'fondo');
   $('main').classList.toggle('mirror', S.mirror);
   $('swKaraoke').setAttribute('aria-checked', S.karaoke);
   $('swMirror').setAttribute('aria-checked', S.mirror);
@@ -142,6 +146,7 @@ export function initSettings() {
   $('offDown').onclick = () => setOffset(S.offset - 0.1);
   $('offUp').onclick = () => setOffset(S.offset + 0.1);
   $('swKaraoke').onclick = () => { S.karaoke = !S.karaoke; resetKaraoke(); applySettings(); };
+  [...$('wordCards').children].forEach(b => b.onclick = () => { S.word = b.dataset.k; applySettings(); });
   $('swMirror').onclick = toggleMirror;
   $('mirBtn').onclick = toggleMirror;
   $('swWords').onclick = () => { S.txWords = !S.txWords; applySettings(); };

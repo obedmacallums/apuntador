@@ -16,12 +16,13 @@ main{position:relative;flex:none;height:max(300px,calc(100vh - var(--chrome,260p
 .cue.pending::after{content:"";display:inline-block;width:.6em;height:.6em;margin-left:.4em;border-radius:50%;background:var(--accent);vertical-align:middle;animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.25}}
 
-/* Word by word: what was said is ink, what is coming is soft, and the word being said is marked
-   without color: a dark pill with light text (w-fondo), or underlined (w-sub). */
-.karaoke .cue.active .w{color:var(--soft);transition:color .12s}
+/* Word by word: the current line starts a little dimmer and fills in to full ink as each word is said.
+   That is all by default ("Suave"): a single moving mark tires many eyes. The word being said can also be
+   underlined ("Subrayado", w-sub on <html>) or get a dark pill with light text ("Con fondo", w-fondo). */
+.karaoke .cue.active .w{color:color-mix(in srgb,var(--ink) 58%,transparent);transition:color .2s}
 .karaoke .cue.active .w.on,.karaoke .cue.active .w.now{color:var(--ink)}
-.w-fondo .karaoke .cue.active .w.now{background:var(--ink);color:var(--bg);border-radius:.2em;padding:0 .14em;margin:0 -.14em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .w-sub .karaoke .cue.active .w.now{text-decoration:underline;text-decoration-thickness:.09em;text-underline-offset:.16em}
+.w-fondo .karaoke .cue.active .w.now{background:var(--ink);color:var(--bg);border-radius:.2em;padding:0 .14em;margin:0 -.14em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 
 .follow{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:2;display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 18px 0 14px;border:0;border-radius:22px;background:var(--accent);color:var(--on-accent);font-size:14px;font-weight:600;white-space:nowrap;box-shadow:var(--shadow);cursor:pointer}
 .follow svg{width:18px;height:18px}
