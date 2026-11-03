@@ -68,7 +68,7 @@ function renderAppearance() {
   }
   pressed($('accDots'), S.accent);
   pressed($('wordCards'), S.word);
-  [...$('wordCards').children].forEach(b => b.disabled = !S.karaoke);
+  $('wordCards').classList.toggle('off', !S.karaoke);   // faded while word-by-word is off, but still tappable
   $('modeNote').textContent = MODE_NOTES[S.mode];
 }
 
@@ -146,7 +146,8 @@ export function initSettings() {
   $('offDown').onclick = () => setOffset(S.offset - 0.1);
   $('offUp').onclick = () => setOffset(S.offset + 0.1);
   $('swKaraoke').onclick = () => { S.karaoke = !S.karaoke; resetKaraoke(); applySettings(); };
-  [...$('wordCards').children].forEach(b => b.onclick = () => { S.word = b.dataset.k; applySettings(); });
+  // Picking a style also turns word by word on: that is what the viewer is asking for.
+  [...$('wordCards').children].forEach(b => b.onclick = () => { S.word = b.dataset.k; S.karaoke = true; applySettings(); });
   $('swMirror').onclick = toggleMirror;
   $('mirBtn').onclick = toggleMirror;
   $('swWords').onclick = () => { S.txWords = !S.txWords; applySettings(); };
